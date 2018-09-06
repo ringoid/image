@@ -1,0 +1,5 @@
+Деплоить нужно в таком порядке:
+
+1. Без NotificationConfiguration в OriginPhotoBucket и без PermissionForEventsToInvokeInternalHandleUploadFunction
+2. Без NotificationConfiguration в OriginPhotoBucket, но с PermissionForEventsToInvokeInternalHandleUploadFunction
+3. С NotificationConfiguration в OriginPhotoBucket и с PermissionForEventsToInvokeInternalHandleUploadFunction

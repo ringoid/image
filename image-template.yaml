@@ -1,0 +1,367 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Image Service
+
+
+Mappings:
+
+  LogMap:
+    PapertrailLog:
+      stage: "logs7.papertrailapp.com:23213"
+      prod: "should-be-prod-papertril-endpoint"
+
+  PresignedUrlName:
+    FunctionName:
+      stage: stage-internal-presign-url-image
+      prod: prod-internal-presign-url-image
+
+  UserPhotoTableCUMap:
+    stage:
+      wcumax: 1
+      wcucrt: 1
+      wcumin: 1
+      rcumax: 1
+      rcucrt: 1
+      rcumin: 1
+    prod:
+      wcumax: should-be-prod-value
+      wcucrt: should-be-prod-value
+      wcumin: should-be-prod-value
+      rcumax: should-be-prod-value
+      rcucrt: should-be-prod-value
+      rcumin: should-be-prod-value
+
+  PhotoUserMappingTableCUMap:
+    stage:
+      wcumax: 1
+      wcucrt: 1
+      wcumin: 1
+      rcumax: 1
+      rcucrt: 1
+      rcumin: 1
+    prod:
+      wcumax: should-be-prod-value
+      wcucrt: should-be-prod-value
+      wcumin: should-be-prod-value
+      rcumax: should-be-prod-value
+      rcucrt: should-be-prod-value
+      rcumin: should-be-prod-value
+
+
+Parameters:
+  Env:
+    Type: String
+    Default: stage
+    AllowedValues:
+      - stage
+      - prod
+    Description: Env name
+  BaseOriginPhotoBucketName:
+    Type: String
+    Default: ringoid-origin-photo
+  BasePublicPhotoBucketName:
+    Type: String
+    Default: ringoid-public-photo
+
+
+Globals:
+    Function:
+        Timeout: 300
+        MemorySize: 512
+        Runtime: go1.x
+        Environment:
+          Variables:
+            ENV: !Ref Env
+            PAPERTRAIL_LOG_ADDRESS: !FindInMap [LogMap, PapertrailLog, !Ref Env]
+            DELIVERY_STREAM:
+              Fn::ImportValue:
+                !Join [ "-", [ !Ref Env, DeliveryStreamExportName] ]
+            INTERNAL_AUTH_FUNCTION_NAME:
+              Fn::ImportValue:
+                !Join [ "-", [ !Ref Env, InternalGetUserIdFunctionExport] ]
+            PRESIGN_FUNCTION_NAME: !FindInMap [PresignedUrlName, FunctionName, !Ref Env]
+            ORIGIN_PHOTO_BUCKET_NAME: !Join [ "-", [ !Ref Env, !Ref BaseOriginPhotoBucketName] ]
+            PHOTO_USER_MAPPING_TABLE: !Ref PhotoUserMappingTable
+            USER_PHOTO_TABLE: !Ref UserPhotoTable
+            PUBLIC_PHOTO_BUCKET_NAME: !Join [ "-", [ !Ref Env, !Ref BasePublicPhotoBucketName] ]
+        Tags:
+          Company: Ringoid
+          Service: image
+          Environment: !Ref Env
+
+Resources:
+
+  GetPreSignedUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Join [ "-", [ !Ref Env, get-presigned-url-image] ]
+      Handler: get_presigned_url
+      CodeUri: ./getpresigned-image.zip
+      Description: Get Pre-Signed url image function
+      Policies:
+        - AmazonDynamoDBFullAccess
+        - AWSLambdaFullAccess
+        - AmazonKinesisFirehoseFullAccess
+      Events:
+        StartEvent:
+          Type: Api
+          Properties:
+            Path: /get_presigned
+            Method: post
+
+  OriginPhotoBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: !Join [ "-", [ !Ref Env, !Ref BaseOriginPhotoBucketName] ]
+      NotificationConfiguration:
+        LambdaConfigurations:
+          -
+            Function: !GetAtt InternalHandleUploadFunction.Arn
+            Event: "s3:ObjectCreated:*"
+
+  InternalHandleUploadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Join [ "-", [ !Ref Env, internal-handle-upload-image] ]
+      Handler: internal_handle_upload
+      CodeUri: ./internal_handle_upload.zip
+      Description: Handle uploaded images
+      Policies:
+        - AmazonDynamoDBFullAccess
+        - AWSLambdaFullAccess
+        - AmazonKinesisFirehoseFullAccess
+        - AmazonS3FullAccess
+        - AmazonKinesisFullAccess
+
+  PermissionForEventsToInvokeInternalHandleUploadFunction:
+    Type: AWS::Lambda::Permission
+    DependsOn: OriginPhotoBucket
+    Properties:
+      FunctionName: !Ref InternalHandleUploadFunction
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+          - OriginPhotoBucket
+          - Arn
+
+  PublicPhotoBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      AccessControl: PublicRead
+      BucketName: !Join [ "-", [ !Ref Env, !Ref BasePublicPhotoBucketName] ]
+
+
+  PhotoUserMappingTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+          TableName: !Join [ "-", [ !Ref Env, Image, PhotoUserMappingTable] ]
+          AttributeDefinitions:
+            -
+              AttributeName: photo_id
+              AttributeType: S
+          KeySchema:
+            -
+              AttributeName: photo_id
+              KeyType: HASH
+
+          ProvisionedThroughput:
+            ReadCapacityUnits: !FindInMap [PhotoUserMappingTableCUMap, !Ref Env, rcucrt]
+            WriteCapacityUnits: !FindInMap [PhotoUserMappingTableCUMap, !Ref Env, wcucrt]
+
+          Tags:
+            - Key: Company
+              Value: Ringoid
+            - Key: Service
+              Value: image
+            - Key: Environment
+              Value: !Ref Env
+
+  PhotoUserMappingTableWriteCapacityScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: PhotoUserMappingTable
+    Properties:
+      MaxCapacity: !FindInMap [PhotoUserMappingTableCUMap, !Ref Env, wcumax]
+      MinCapacity: !FindInMap [PhotoUserMappingTableCUMap, !Ref Env, wcumin]
+      ResourceId: !Join
+        - /
+        - - table
+          - !Join [ "-", [ !Ref Env, Image, PhotoUserMappingTable] ]
+      RoleARN: !GetAtt
+        - ScalingRole
+        - Arn
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: dynamodb
+
+  PhotoUserMappingTableReadCapacityScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: PhotoUserMappingTable
+    Properties:
+      MaxCapacity: !FindInMap [PhotoUserMappingTableCUMap, !Ref Env, rcumax]
+      MinCapacity: !FindInMap [PhotoUserMappingTableCUMap, !Ref Env, rcumin]
+      ResourceId: !Join
+        - /
+        - - table
+          - !Join [ "-", [ !Ref Env, Image, PhotoUserMappingTable] ]
+      RoleARN: !GetAtt
+        - ScalingRole
+        - Arn
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: dynamodb
+
+  PhotoUserMappingTableWriteScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    DependsOn: PhotoUserMappingTable
+    Properties:
+      PolicyName: WriteAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId:
+        Ref: PhotoUserMappingTableWriteCapacityScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
+
+  PhotoUserMappingTableReadScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    DependsOn: PhotoUserMappingTable
+    Properties:
+      PolicyName: ReadAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId:
+        Ref: PhotoUserMappingTableReadCapacityScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
+
+  UserPhotoTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+          TableName: !Join [ "-", [ !Ref Env, Image, UserPhotoTable] ]
+          AttributeDefinitions:
+            -
+              AttributeName: user_id
+              AttributeType: S
+            -
+              AttributeName: photo_id
+              AttributeType: S
+
+          KeySchema:
+            -
+              AttributeName: user_id
+              KeyType: HASH
+            -
+              AttributeName: photo_id
+              KeyType: RANGE
+
+          ProvisionedThroughput:
+            ReadCapacityUnits: !FindInMap [UserPhotoTableCUMap, !Ref Env, rcucrt]
+            WriteCapacityUnits: !FindInMap [UserPhotoTableCUMap, !Ref Env, wcucrt]
+
+          Tags:
+            - Key: Company
+              Value: Ringoid
+            - Key: Service
+              Value: image
+            - Key: Environment
+              Value: !Ref Env
+
+  UserPhotoTableWriteCapacityScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: UserPhotoTable
+    Properties:
+      MaxCapacity: !FindInMap [UserPhotoTableCUMap, !Ref Env, wcumax]
+      MinCapacity: !FindInMap [UserPhotoTableCUMap, !Ref Env, wcumin]
+      ResourceId: !Join
+        - /
+        - - table
+          - !Join [ "-", [ !Ref Env, Image, UserPhotoTable] ]
+      RoleARN: !GetAtt
+        - ScalingRole
+        - Arn
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: dynamodb
+
+  UserPhotoTableReadCapacityScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: UserPhotoTable
+    Properties:
+      MaxCapacity: !FindInMap [UserPhotoTableCUMap, !Ref Env, rcumax]
+      MinCapacity: !FindInMap [UserPhotoTableCUMap, !Ref Env, rcumin]
+      ResourceId: !Join
+        - /
+        - - table
+          - !Join [ "-", [ !Ref Env, Image, UserPhotoTable] ]
+      RoleARN: !GetAtt
+        - ScalingRole
+        - Arn
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: dynamodb
+
+  UserPhotoTableWriteScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    DependsOn: UserPhotoTable
+    Properties:
+      PolicyName: WriteAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId:
+        Ref: UserPhotoTableWriteCapacityScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
+
+  UserPhotoTableReadScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    DependsOn: UserPhotoTable
+    Properties:
+      PolicyName: ReadAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId:
+        Ref: UserPhotoTableReadCapacityScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
+
+
+  ScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - "application-autoscaling.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        -
+          PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: Allow
+                Action:
+                  - "dynamodb:DescribeTable"
+                  - "dynamodb:UpdateTable"
+                  - "cloudwatch:PutMetricAlarm"
+                  - "cloudwatch:DescribeAlarms"
+                  - "cloudwatch:GetMetricStatistics"
+                  - "cloudwatch:SetAlarmState"
+                  - "cloudwatch:DeleteAlarms"
+                Resource: "*"

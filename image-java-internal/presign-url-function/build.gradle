@@ -1,0 +1,63 @@
+import jp.classmethod.aws.gradle.lambda.AWSLambdaMigrateFunctionTask
+
+apply plugin: 'java'
+apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'jp.classmethod.aws.lambda'
+
+repositories {
+    mavenCentral()
+}
+
+aws {
+    profileName = "default"
+    region = "eu-west-1"
+}
+
+lambda {
+    region = "eu-west-1"
+}
+
+tasks.withType(JavaCompile) {
+    sourceCompatibility = "1.8"
+    targetCompatibility = "1.8"
+    options.encoding = 'UTF-8'
+}
+
+shadowJar {
+    zip64 true
+    destinationDir file("build/shadow")
+    baseName = 'presign-function'
+    classifier = null
+    version = null
+}
+
+task migratePresignFunctionToStage(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
+    functionName = "stage-internal-presign-url-image"
+    role = "arn:aws:iam::${aws.accountId}:role/PresignFunctionRole"
+    zipFile = file("build/shadow/presign-function.jar")
+    handler = "com.ringoid.PresignFunction::handle"
+    runtime = "Java8"
+
+    functionDescription = "Presign url for uploading to s3"
+    memorySize = 512
+    timeout = 300
+}
+
+task migratePresignFunctionToProd(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
+    functionName = "prod-internal-presign-url-image"
+    role = "arn:aws:iam::${aws.accountId}:role/PresignFunctionRole"
+    zipFile = file("build/shadow/presign-function.jar")
+    handler = "com.ringoid.PresignFunction::handle"
+    runtime = "Java8"
+
+    functionDescription = "Presign url for uploading to s3"
+    memorySize = 512
+    timeout = 300
+}
+
+dependencies {
+    compile "com.amazonaws:aws-lambda-java-core:$awsLambdaCoreVersion"
+    compile "com.amazonaws:aws-java-sdk-core:$awsJavaSdkVersion"
+    compile "com.amazonaws:aws-java-sdk-s3:$awsJavaSdkVersion"
+    compile "io.symphonia:lambda-logging:$lambdaLoggingVersion"
+}
