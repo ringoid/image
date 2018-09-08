@@ -11,13 +11,10 @@ import (
 	"os"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"encoding/json"
 	"github.com/aws/aws-lambda-go/events"
 	"time"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go/service/lambda"
-	"crypto/sha1"
-	"github.com/satori/go.uuid"
 	"errors"
 	"strings"
 	"strconv"
@@ -318,89 +315,6 @@ func savePhoto(userPhoto *apimodel.UserPhoto, lc *lambdacontext.LambdaContext) (
 	}
 	anlogger.Debugf(lc, "internal_handle_upload.go : successfully save photo %v for userId [%s]", userPhoto, userPhoto.UserId)
 	return true, ""
-}
-
-//return generated photoId, was everything ok and error string
-func generatePhotoId(userId string, lc *lambdacontext.LambdaContext) (string, bool, string) {
-	anlogger.Debugf(lc, "internal_handle_upload.go : generate photoId for userId [%s]", userId)
-	saltForPhotoId, err := uuid.NewV4()
-	if err != nil {
-		anlogger.Errorf(lc, "internal_handle_upload.go : error while generate salt for photoId, userId [%s] : %v", userId, err)
-		return "", false, apimodel.InternalServerError
-	}
-	sha := sha1.New()
-	_, err = sha.Write([]byte(userId))
-	if err != nil {
-		anlogger.Errorf(lc, "internal_handle_upload.go : error while write userId to sha algo, userId [%s] : %v", userId, err)
-		return "", false, apimodel.InternalServerError
-	}
-	_, err = sha.Write([]byte(saltForPhotoId.String()))
-	if err != nil {
-		anlogger.Errorf(lc, "internal_handle_upload.go : error while write salt to sha algo, userId [%s] : %v", userId, err)
-		return "", false, apimodel.InternalServerError
-	}
-	resultPhotoId := fmt.Sprintf("%x", sha.Sum(nil))
-	anlogger.Debugf(lc, "internal_handle_upload.go : successfully generate photoId [%s] for userId [%s]", resultPhotoId, userId)
-	return resultPhotoId, true, ""
-}
-
-func parseParams(params string, lc *lambdacontext.LambdaContext) (*apimodel.GetPresignUrlReq, bool, string) {
-	anlogger.Debugf(lc, "internal_handle_upload.go : parse request body %s", params)
-	var req apimodel.GetPresignUrlReq
-	err := json.Unmarshal([]byte(params), &req)
-	if err != nil {
-		anlogger.Errorf(lc, "internal_handle_upload.go : error marshaling required params from the string [%s] : %v", params, err)
-		return nil, false, apimodel.InternalServerError
-	}
-
-	if req.Extension == "" {
-		anlogger.Errorf(lc, "internal_handle_upload.go : wrong required param extension [%s]", req.Extension)
-		return nil, false, apimodel.WrongRequestParamsClientError
-	}
-
-	anlogger.Debugf(lc, "internal_handle_upload.go : successfully parse request string [%s] to %v", params, req)
-	return &req, true, ""
-}
-
-//return uri, ok, error string
-func makePresignUrl(userId, bucket, key, functionName string, lc *lambdacontext.LambdaContext) (string, bool, string) {
-	anlogger.Debugf(lc, "internal_handle_upload.go : make pre-signed url for userId [%s], bucket [%s] and key [%s]",
-		userId, bucket, key)
-
-	req := apimodel.MakePresignUrlInternalReq{
-		Bucket: bucket,
-		Key:    key,
-	}
-
-	jsonBody, err := json.Marshal(req)
-	if err != nil {
-		anlogger.Errorf(lc, "internal_handle_upload.go : error marshaling req %s into json, for userId [%s] : %v", req, userId, err)
-		return "", false, apimodel.InternalServerError
-	}
-
-	resp, err := clientLambda.Invoke(&lambda.InvokeInput{FunctionName: aws.String(functionName), Payload: jsonBody})
-	if err != nil {
-		anlogger.Errorf(lc, "internal_handle_upload.go : error invoke function [%s] with body %s, for userId [%s] : %v",
-			functionName, jsonBody, userId, err)
-		return "", false, apimodel.InternalServerError
-	}
-
-	if *resp.StatusCode != 200 {
-		anlogger.Errorf(lc, "internal_handle_upload.go : status code = %d, response body %s for request %s, for userId [%s]",
-			*resp.StatusCode, string(resp.Payload), jsonBody, userId)
-		return "", false, apimodel.InternalServerError
-	}
-
-	var response apimodel.MakePresignUrlInternalResp
-	err = json.Unmarshal(resp.Payload, &response)
-	if err != nil {
-		anlogger.Errorf(lc, "internal_handle_upload.go : error unmarshaling response %s into json, for userId [%s] : %v",
-			string(resp.Payload), userId, err)
-		return "", false, apimodel.InternalServerError
-	}
-
-	anlogger.Debugf(lc, "internal_handle_upload.go : successfully made pre-sign url [%s], for userId [%s]", response.Uri, userId)
-	return response.Uri, true, ""
 }
 
 func main() {
