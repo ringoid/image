@@ -51,6 +51,27 @@ func NewUserUploadedPhotoEvent(photo UserPhoto) *UserUploadedPhotoEvent {
 		PhotoType: photo.PhotoType,
 		Size:      photo.Size,
 		UnixTime:  time.Now().Unix(),
-		EventType: "IMAGE_USER_UPLOADED_PHOTO",
+		EventType: "IMAGE_USER_UPLOAD_PHOTO",
+	}
+}
+
+type UserDeletePhotoEvent struct {
+	UserId    string `json:"userId"`
+	PhotoId   string `json:"photoId"`
+	UnixTime  int64  `json:"unixTime"`
+	EventType string `json:"eventType"`
+}
+
+func (event UserDeletePhotoEvent) String() string {
+	return fmt.Sprintf("[UserDeletePhotoEvent={userId=%s, photoId=%s, unixTime=%v, eventType=%s}]",
+		event.UserId, event.PhotoId, event.UnixTime, event.EventType)
+}
+
+func NewUserDeletePhotoEvent(userId, photoId string) *UserDeletePhotoEvent {
+	return &UserDeletePhotoEvent{
+		UserId:    userId,
+		PhotoId:   photoId,
+		UnixTime:  time.Now().Unix(),
+		EventType: "IMAGE_USER_DELETE_PHOTO",
 	}
 }

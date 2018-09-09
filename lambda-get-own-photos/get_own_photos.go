@@ -196,10 +196,8 @@ func getOwnPhotos(userId, resolution string, lc *lambdacontext.LambdaContext) ([
 	}
 	result, err := awsDbClient.Query(input)
 	if err != nil {
-		if err != nil {
-			anlogger.Errorf(lc, "get_own_photos.go : error while query all own photos userId [%s] with resolution [%s] : %v", userId, resolution, err)
-			return make([]*apimodel.UserPhoto, 0), false, apimodel.InternalServerError
-		}
+		anlogger.Errorf(lc, "get_own_photos.go : error while query all own photos userId [%s] with resolution [%s] : %v", userId, resolution, err)
+		return make([]*apimodel.UserPhoto, 0), false, apimodel.InternalServerError
 	}
 
 	if *result.Count == 0 {

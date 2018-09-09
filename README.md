@@ -64,6 +64,38 @@ Possible errorCodes:
 * WrongRequestParamsClientError
 * InvalidAccessTokenClientError
 
+### Delete user's photo
+
+* url ``https://{API ENDPOINT}/Prod/delete_photo``
+
+POST request
+
+Headers:
+
+* Content-Type : application/json
+
+Body:
+
+    {
+        "accessToken":"adasdasd-fadfs-sdffd",
+        "photoId":"lsdkfjlskdjf-sdflksndfl"
+    }
+    
+    all parameters are required
+    
+ Response Body:
+ 
+    {
+        "errorCode":"",
+        "errorMessage":""
+    }
+    
+Possible errorCodes:
+
+* InternalServerError
+* InvalidAccessTokenClientError
+* WrongRequestParamsClientError
+
 
 ## Analytics Events
 
@@ -77,7 +109,7 @@ Possible errorCodes:
 
 `{"userId":"aslkdl-asfmfa-asd","bucket":"origin-photo","photoKey":"aslkdl-asfmfa-asd","unixTime":1534338646,"eventType":"IMAGE_USER_ASK_UPLOAD_PHOTO_LINK"}`
 
-2. IMAGE_USER_UPLOADED_PHOTO
+2. IMAGE_USER_UPLOAD_PHOTO
 
 * userId - string
 * bucket - string
@@ -86,6 +118,17 @@ Possible errorCodes:
 * photoType - string (origin in most cases)
 * size - int
 * unixTime - int
-* eventType - string (IMAGE_USER_UPLOADED_PHOTO)
+* eventType - string (IMAGE_USER_UPLOAD_PHOTO)
 
-`{"userId":"aslkdl-asfmfa-asd","bucket":"origin-photo","photoKey":"aslkdl-asfmfa-asd","photoId":"aslkdl-asfmfa-asd","photoType":"origin","size":1200,"unixTime":1534338646,"eventType":"IMAGE_USER_ASK_UPLOAD_PHOTO_LINK"}`
+`{"userId":"aslkdl-asfmfa-asd","bucket":"origin-photo","photoKey":"aslkdl-asfmfa-asd","photoId":"aslkdl-asfmfa-asd","photoType":"origin","size":1200,"unixTime":1534338646,"eventType":"IMAGE_USER_UPLOAD_PHOTO"}`
+
+3. IMAGE_USER_DELETE_PHOTO
+
+* userId - string
+* photoId - string
+* unixTime - int
+* eventType - string (IMAGE_USER_DELETE_PHOTO)
+
+`{"userId":"aslkdl-asfmfa-asd","photoId":"aslkdl-asfmfa-asd","unixTime":1534338646,"eventType":"IMAGE_USER_DELETE_PHOTO"}`
+
+

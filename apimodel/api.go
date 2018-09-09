@@ -74,3 +74,12 @@ type OwnPhoto struct {
 func (obj OwnPhoto) String() string {
 	return fmt.Sprintf("[OwnPhoto={photoId=%s, photoUri=%s}]", obj.PhotoId, obj.PhotoUri)
 }
+
+type DeletePhotoReq struct {
+	AccessToken string `json:"accessToken"`
+	PhotoId     string `json:"photoId"`
+}
+
+func (req DeletePhotoReq) String() string {
+	return fmt.Sprintf("[DeletePhotoReq={accessToken=%s, photoId=%s}]", req.AccessToken, req.PhotoId)
+}

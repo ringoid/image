@@ -7,6 +7,8 @@ build:
 	GOOS=linux go build lambda-handle-upload/internal_handle_upload.go
 	@echo '--- Building get-own-photos-image function ---'
 	GOOS=linux go build lambda-get-own-photos/get_own_photos.go
+	@echo '--- Building delete-photo-image function ---'
+	GOOS=linux go build lambda-delete-photo/delete_photo.go
 
 stage-deploy-internal:
 	@echo '--- Build and deploy PresignFunction to STAGE ---'
@@ -23,6 +25,8 @@ zip_lambda: build
 	zip internal_handle_upload.zip ./internal_handle_upload
 	@echo '--- Zip get-own-photos-image function ---'
 	zip get_own_photos.zip ./get_own_photos
+	@echo '--- Zip delete-photo-image function ---'
+	zip delete_photo.zip ./delete_photo
 
 stage-deploy: stage-deploy-internal zip_lambda
 	@echo '--- Build lambda stage ---'
@@ -41,4 +45,6 @@ clean:
 	rm -rf internal_handle_upload
 	rm -rf get_own_photos.zip
 	rm -rf get_own_photos
+	rm -rf delete_photo.zip
+	rm -rf delete_photo
 

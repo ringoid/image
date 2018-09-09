@@ -168,6 +168,25 @@ Resources:
             Path: /get_own_photos
             Method: get
 
+  DeletePhotoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Join [ "-", [ !Ref Env, delete-photo-image] ]
+      Handler: delete_photo
+      CodeUri: ./delete_photo.zip
+      Description: Delete user's photo
+      Policies:
+        - AmazonDynamoDBFullAccess
+        - AWSLambdaFullAccess
+        - AmazonKinesisFirehoseFullAccess
+      Events:
+        StartEvent:
+          Type: Api
+          Properties:
+            Path: /delete_photo
+            Method: post
+
+
   PhotoUserMappingTable:
     Type: AWS::DynamoDB::Table
     Properties:
