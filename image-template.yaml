@@ -151,6 +151,22 @@ Resources:
       AccessControl: PublicRead
       BucketName: !Join [ "-", [ !Ref Env, !Ref BasePublicPhotoBucketName] ]
 
+  GetOwnPhotosFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Join [ "-", [ !Ref Env, get-own-photos-image] ]
+      Handler: get_own_photos
+      CodeUri: ./get_own_photos.zip
+      Description: Get all user's photos
+      Policies:
+        - AmazonDynamoDBFullAccess
+        - AWSLambdaFullAccess
+      Events:
+        StartEvent:
+          Type: Api
+          Properties:
+            Path: /get_own_photos
+            Method: get
 
   PhotoUserMappingTable:
     Type: AWS::DynamoDB::Table

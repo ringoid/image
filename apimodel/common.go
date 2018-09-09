@@ -39,6 +39,7 @@ const (
 	PhotoBucketColumnName    = "photo_bucket"
 	PhotoKeyColumnName       = "photo_key"
 	PhotoSizeColumnName      = "photo_size"
+	PhotoDeletedAt           = "deleted_at"
 
 	WhoCanSeePhotoColumnName      = "who_can_see_photo"
 	SafeDistanceInMeterColumnName = "safe_distance_in_meter"
@@ -66,6 +67,8 @@ const (
 	InvalidAccessTokenClientError = `{"errorCode":"InvalidAccessTokenClientError","errorMessage":"Invalid access token"}`
 )
 
+var AllowedPhotoResolution map[string]bool
+
 type BaseResponse struct {
 	ErrorCode    string `json:"errorCode"`
 	ErrorMessage string `json:"errorMessage"`
@@ -73,4 +76,9 @@ type BaseResponse struct {
 
 func (resp BaseResponse) String() string {
 	return fmt.Sprintf("[BaseResponse={errorCode=%s, errorMessage=%s}", resp.ErrorCode, resp.ErrorMessage)
+}
+
+func init() {
+	AllowedPhotoResolution = make(map[string]bool)
+	AllowedPhotoResolution["640x480"] = true
 }

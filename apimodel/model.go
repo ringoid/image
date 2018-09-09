@@ -10,9 +10,10 @@ type UserPhoto struct {
 	Bucket         string
 	Key            string
 	Size           int64
+	UpdatedAt      string
 }
 
 func (model UserPhoto) String() string {
-	return fmt.Sprintf("[UserPhoto={userId=%s, photoId=%s, photoSourceUri=%s, photoType=%s, bucket=%s, key=%s, size=%v}]",
-		model.UserId, model.PhotoId, model.PhotoSourceUri, model.PhotoType, model.Bucket, model.Key, model.Size)
+	return fmt.Sprintf("[UserPhoto={userId=%s, photoId=%s, photoSourceUri=%s, photoType=%s, bucket=%s, key=%s, size=%v, updatedAt=%s}]",
+		model.UserId, model.PhotoId, model.PhotoSourceUri, model.PhotoType, model.Bucket, model.Key, model.Size, model.UpdatedAt)
 }

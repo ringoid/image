@@ -37,6 +37,34 @@ Possible errorCodes:
 * InvalidAccessTokenClientError
 * WrongRequestParamsClientError
 
+### Get user's own photos
+
+* url ``https://{API ENDPOINT}/Prod/get_own_photos?accessToken={ACCESS TOKEN}&resolution=640x480``
+
+GET request
+
+Headers:
+
+* Content-Type : application/json
+
+ Response Body:
+ 
+    {
+        "errorCode":"",
+        "errorMessage":"",
+        "photos":[
+            {"photoId":"12dd","photoUri":"https://bla-bla.com/sss.jpg"},
+            {"photoId":"13dd","photoUri":"https://bla-bla.com/sss2.jpg"}
+        ]
+    }
+    
+Possible errorCodes:
+
+* InternalServerError
+* WrongRequestParamsClientError
+* InvalidAccessTokenClientError
+
+
 ## Analytics Events
 
 1. IMAGE_USER_ASK_UPLOAD_PHOTO_LINK
@@ -49,7 +77,7 @@ Possible errorCodes:
 
 `{"userId":"aslkdl-asfmfa-asd","bucket":"origin-photo","photoKey":"aslkdl-asfmfa-asd","unixTime":1534338646,"eventType":"IMAGE_USER_ASK_UPLOAD_PHOTO_LINK"}`
 
-2.
+2. IMAGE_USER_UPLOADED_PHOTO
 
 * userId - string
 * bucket - string

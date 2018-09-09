@@ -56,3 +56,21 @@ type MakePresignUrlInternalResp struct {
 func (resp MakePresignUrlInternalResp) String() string {
 	return fmt.Sprintf("[MakePresignUrlInternalResp={uri=%s}]", resp.Uri)
 }
+
+type GetOwnPhotosResp struct {
+	BaseResponse
+	Photos []OwnPhoto `json:"photos"`
+}
+
+func (resp GetOwnPhotosResp) String() string {
+	return fmt.Sprintf("[%v, GetOwnPhotosResp={photos=%v}]", resp.BaseResponse, resp.Photos)
+}
+
+type OwnPhoto struct {
+	PhotoId  string `json:"photoId"`
+	PhotoUri string `json:"photoUri"`
+}
+
+func (obj OwnPhoto) String() string {
+	return fmt.Sprintf("[OwnPhoto={photoId=%s, photoUri=%s}]", obj.PhotoId, obj.PhotoUri)
+}
