@@ -216,6 +216,7 @@ Resources:
       Policies:
         - AmazonDynamoDBFullAccess
         - AmazonSQSFullAccess
+        - AmazonS3FullAccess
       Events:
         StartEvent:
           Type: SQS

@@ -15,20 +15,20 @@ func (task AsyncTask) String() string {
 }
 
 type RemovePhotoAsyncTask struct {
-	AsyncTask
+	TaskType  string `json:"taskType"`
 	UserId    string `json:"userId"`
 	PhotoId   string `json:"photoId"`
 	TableName string `json:"tableName"`
 }
 
 func (task RemovePhotoAsyncTask) String() string {
-	return fmt.Sprintf("[%v, RemovePhotoAsyncTask={userId=%s, photoId=%s, tableName=%s}]",
-		task.AsyncTask, task.UserId, task.PhotoId, task.TableName)
+	return fmt.Sprintf("[RemovePhotoAsyncTask={taskType=%s, userId=%s, photoId=%s, tableName=%s}]",
+		task.TaskType, task.UserId, task.PhotoId, task.TableName)
 }
 
 func NewRemovePhotoAsyncTask(userId, photoId, tableName string) *RemovePhotoAsyncTask {
 	return &RemovePhotoAsyncTask{
-		AsyncTask: AsyncTask{TaskType: RemovePhotoTaskType},
+		TaskType:  RemovePhotoTaskType,
 		UserId:    userId,
 		PhotoId:   photoId,
 		TableName: tableName,
