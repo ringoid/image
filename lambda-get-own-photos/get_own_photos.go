@@ -50,7 +50,7 @@ func init() {
 	}
 	fmt.Printf("get_own_photos.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]", papertrailAddress)
 
-	anlogger, err = syslog.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "create-auth"))
+	anlogger, err = syslog.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "get-own-photos-image"))
 	if err != nil {
 		fmt.Errorf("get_own_photos.go : error during startup : %v", err)
 		os.Exit(1)

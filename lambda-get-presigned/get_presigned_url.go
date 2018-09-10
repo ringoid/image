@@ -52,7 +52,7 @@ func init() {
 	}
 	fmt.Printf("get_presigned_url.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]", papertrailAddress)
 
-	anlogger, err = syslog.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "create-auth"))
+	anlogger, err = syslog.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "get-presign-url-image"))
 	if err != nil {
 		fmt.Errorf("get_presigned_url.go : error during startup : %v", err)
 		os.Exit(1)

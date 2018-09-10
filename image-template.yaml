@@ -84,6 +84,7 @@ Globals:
             PHOTO_USER_MAPPING_TABLE: !Ref PhotoUserMappingTable
             USER_PHOTO_TABLE: !Ref UserPhotoTable
             PUBLIC_PHOTO_BUCKET_NAME: !Join [ "-", [ !Ref Env, !Ref BasePublicPhotoBucketName] ]
+            ASYNC_TASK_SQS_QUEUE: !Ref AsyncTaskSqsQueue
         Tags:
           Company: Ringoid
           Service: image
@@ -179,12 +180,51 @@ Resources:
         - AmazonDynamoDBFullAccess
         - AWSLambdaFullAccess
         - AmazonKinesisFirehoseFullAccess
+        - AmazonSQSFullAccess
       Events:
         StartEvent:
           Type: Api
           Properties:
             Path: /delete_photo
             Method: post
+
+  AsyncTaskSqsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Join [ "-", [ !Ref Env, image, async-task-queue] ]
+      VisibilityTimeout: 300
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+            - AsyncTaskDeadMessageSqsQueue
+            - Arn
+        maxReceiveCount: 3
+
+  AsyncTaskDeadMessageSqsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Join [ "-", [ !Ref Env, image, async-task-dead-messages-queue] ]
+      VisibilityTimeout: 300
+
+  InternalHandleAsyncTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Join [ "-", [ !Ref Env, internal-handle-async-task-image] ]
+      Handler: internal_handle_task
+      CodeUri: ./internal_handle_task.zip
+      Description: Handle async task from the queue
+      Policies:
+        - AmazonDynamoDBFullAccess
+        - AmazonSQSFullAccess
+      Events:
+        StartEvent:
+          Type: SQS
+          Properties:
+            Queue:
+              Fn::GetAtt:
+                - AsyncTaskSqsQueue
+                - Arn
+            BatchSize: 10
 
 
   PhotoUserMappingTable:

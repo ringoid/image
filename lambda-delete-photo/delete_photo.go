@@ -18,6 +18,7 @@ import (
 	"time"
 	"strings"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/sqs"
 )
 
 var anlogger *syslog.Logger
@@ -30,6 +31,8 @@ var clientLambda *lambda.Lambda
 var photoUserMappingTableName string
 var originPhotoBucketName string
 var userPhotoTable string
+var asyncTaskQueue string
+var awsSqsClient *sqs.SQS
 
 func init() {
 	var env string
@@ -52,7 +55,7 @@ func init() {
 	}
 	fmt.Printf("delete_photo.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]", papertrailAddress)
 
-	anlogger, err = syslog.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "create-auth"))
+	anlogger, err = syslog.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "delete-photo-image"))
 	if err != nil {
 		fmt.Errorf("delete_photo.go : error during startup : %v", err)
 		os.Exit(1)
@@ -94,6 +97,13 @@ func init() {
 	}
 	anlogger.Debugf(nil, "delete_photo.go : start with USER_PHOTO_TABLE = [%s]", userPhotoTable)
 
+	asyncTaskQueue, ok = os.LookupEnv("ASYNC_TASK_SQS_QUEUE")
+	if !ok {
+		fmt.Printf("delete_photo.go : env can not be empty ASYNC_TASK_SQS_QUEUE")
+		os.Exit(1)
+	}
+	anlogger.Debugf(nil, "delete_photo.go : start with ASYNC_TASK_SQS_QUEUE = [%s]", asyncTaskQueue)
+
 	awsSession, err = session.NewSession(aws.NewConfig().
 		WithRegion(apimodel.Region).WithMaxRetries(apimodel.MaxRetries).
 		WithLogger(aws.LoggerFunc(func(args ...interface{}) { anlogger.AwsLog(args) })).WithLogLevel(aws.LogOff))
@@ -117,6 +127,8 @@ func init() {
 
 	awsDeliveryStreamClient = firehose.New(awsSession)
 	anlogger.Debugf(nil, "delete_photo.go : firehose client was successfully initialized")
+
+	awsSqsClient = sqs.New(awsSession)
 }
 
 func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -181,7 +193,22 @@ func getAllPhotoIds(sourceId, userId string, lc *lambdacontext.LambdaContext) ([
 
 //return ok and error string
 func asyncDel(userId, photoId string, lc *lambdacontext.LambdaContext) (bool, string) {
-	//todo:implement
+	anlogger.Debugf(lc, "delete_photo.go : send async task to delete photoId [%s] for userId [%s]", photoId, userId)
+	task := apimodel.NewRemovePhotoAsyncTask(userId, photoId, userPhotoTable)
+	body, err := json.Marshal(task)
+	if err != nil {
+		anlogger.Errorf(lc, "delete_photo.go : error marshal task %v for userId [%s]: %v", task, userId, err)
+		return false, apimodel.InternalServerError
+	}
+	input := &sqs.SendMessageInput{
+		QueueUrl:    aws.String(asyncTaskQueue),
+		MessageBody: aws.String(string(body)),
+	}
+	_, err = awsSqsClient.SendMessage(input)
+	if err != nil {
+		anlogger.Errorf(lc, "delete_photo.go : error sending async task %v to the queue for userId [%s] : %v", task, userId, err)
+		return false, apimodel.InternalServerError
+	}
 	return true, ""
 }
 
