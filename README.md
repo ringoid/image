@@ -53,8 +53,8 @@ Headers:
         "errorCode":"",
         "errorMessage":"",
         "photos":[
-            {"photoId":"12dd","photoUri":"https://bla-bla.com/sss.jpg"},
-            {"photoId":"13dd","photoUri":"https://bla-bla.com/sss2.jpg"}
+            {"photoId":"12dd","photoUri":"https://bla-bla.com/sss.jpg","likes":22},
+            {"photoId":"13dd","photoUri":"https://bla-bla.com/sss2.jpg","likes":0}
         ]
     }
     

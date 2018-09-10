@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"sort"
+	"math/rand"
 )
 
 var anlogger *syslog.Logger
@@ -143,6 +144,10 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		anlogger.Errorf(lc, "get_own_photos.go : return %s to client", errStr)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
+
+	//call fake likes
+	makeFakeLikes(photos)
+
 	photos = sortOwnPhotos(photos)
 
 	resp := apimodel.GetOwnPhotosResp{}
@@ -151,6 +156,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		ownPhotos = append(ownPhotos, apimodel.OwnPhoto{
 			PhotoId:  value.PhotoId,
 			PhotoUri: value.PhotoSourceUri,
+			Likes:    value.Likes,
 		})
 	}
 	resp.Photos = ownPhotos
@@ -165,9 +171,20 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	return events.APIGatewayProxyResponse{StatusCode: 200, Body: string(body)}, nil
 }
 
+func makeFakeLikes(source []*apimodel.UserPhoto) {
+	for index, val := range source {
+		if index != 0 {
+			val.Likes = rand.Intn(100)
+		}
+	}
+}
+
 func sortOwnPhotos(source []*apimodel.UserPhoto) []*apimodel.UserPhoto {
 	sort.SliceStable(source, func(i, j int) bool {
-		return source[i].UpdatedAt > source[j].UpdatedAt
+		if source[i].Likes == source[j].Likes {
+			return source[i].UpdatedAt > source[j].UpdatedAt
+		}
+		return source[i].Likes > source[j].Likes
 	})
 	return source
 }

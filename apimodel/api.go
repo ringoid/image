@@ -69,10 +69,11 @@ func (resp GetOwnPhotosResp) String() string {
 type OwnPhoto struct {
 	PhotoId  string `json:"photoId"`
 	PhotoUri string `json:"photoUri"`
+	Likes    int    `json:"likes"`
 }
 
 func (obj OwnPhoto) String() string {
-	return fmt.Sprintf("[OwnPhoto={photoId=%s, photoUri=%s}]", obj.PhotoId, obj.PhotoUri)
+	return fmt.Sprintf("[OwnPhoto={photoId=%s, photoUri=%s, likes=%d}]", obj.PhotoId, obj.PhotoUri, obj.Likes)
 }
 
 type DeletePhotoReq struct {
