@@ -19,6 +19,11 @@ import (
 	"strings"
 	"strconv"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"bytes"
+	"github.com/nfnt/resize"
+	"bufio"
+	"image/jpeg"
 )
 
 var anlogger *syslog.Logger
@@ -33,6 +38,8 @@ var originPhotoBucketName string
 var publicPhotoBucketName string
 var userPhotoTable string
 var awsS3Client *s3.S3
+var downloader *s3manager.Downloader
+var uploader *s3manager.Uploader
 
 func init() {
 	var env string
@@ -121,6 +128,12 @@ func init() {
 	awsS3Client = s3.New(awsSession)
 	anlogger.Debugf(nil, "internal_handle_upload.go : s3 client was successfully initialized")
 
+	downloader = s3manager.NewDownloader(awsSession)
+	anlogger.Debugf(nil, "internal_handle_upload.go : s3 downloader was successfully initialized")
+
+	uploader = s3manager.NewUploader(awsSession)
+	anlogger.Debugf(nil, "internal_handle_upload.go : s3 uploader was successfully initialized")
+
 	deliveryStreamName, ok = os.LookupEnv("DELIVERY_STREAM")
 	if !ok {
 		anlogger.Fatalf(nil, "internal_handle_upload.go : env can not be empty DELIVERY_STREAM")
@@ -176,31 +189,107 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 		event := apimodel.NewUserUploadedPhotoEvent(userPhoto)
 		apimodel.SendAnalyticEvent(event, userPhoto.UserId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
 
-		//Now transform foto to fake 640x480
-		userPhoto = apimodel.UserPhoto{
-			UserId:    userId,
-			PhotoId:   "640x480_" + originPhotoId,
-			PhotoType: "640x480",
-			Bucket:    publicPhotoBucketName,
-			Key:       "640x480_" + objectKey,
-			Size:      objectSize,
-		}
-		link, ok, errStr := transformImage(
-			userPhoto.Bucket, userPhoto.Key, objectBucket, objectKey, userPhoto.UserId, lc)
+		sourceImage, ok, errStr := getImage(objectBucket, objectKey, userId, lc)
 		if !ok {
 			return errors.New(errStr)
 		}
 
-		userPhoto.PhotoSourceUri = link
-		ok, errStr = savePhoto(&userPhoto, lc)
-		if !ok {
-			return errors.New(errStr)
+		for mapkey, _ := range apimodel.AllowedPhotoResolution {
+			resultPhoto, ok, errStr := resizeImage(sourceImage, mapkey, originPhotoId, objectKey, userId, lc)
+			if !ok {
+				return errors.New(errStr)
+			}
+			ok, errStr = savePhoto(resultPhoto, lc)
+			if !ok {
+				return errors.New(errStr)
+			}
+			anlogger.Infof(lc, "internal_handle_upload.go : successfully save [%s] photo %v for userId [%s]", mapkey, userPhoto, userPhoto.UserId)
 		}
-		anlogger.Infof(lc, "internal_handle_upload.go : successfully save 640x480 photo %v for userId [%s]", userPhoto, userPhoto.UserId)
-		//end transformation
 	}
 
 	return nil
+}
+
+//return image, ok and error string
+func getImage(bucket, key, userId string, lc *lambdacontext.LambdaContext) ([]byte, bool, string) {
+	anlogger.Debugf(lc, "internal_handle_upload.go : get image from bucket [%s] with a key [%s] for userId [%s]", bucket, key, userId)
+
+	buff := &aws.WriteAtBuffer{}
+	_, err := downloader.Download(buff, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		anlogger.Errorf(lc, "internal_handle_upload.go : error downloading image from bucket [%s] with a key [%s] for userId [%s] : %v",
+			bucket, key, userId, err)
+		return nil, false, apimodel.InternalServerError
+	}
+	anlogger.Debugf(lc, "internal_handle_upload.go : successfully got image from bucket [%s] with a key [%s] for userId [%s]", bucket, key, userId)
+	return buff.Bytes(), true, ""
+}
+
+//return ok and error string
+func uploadImage(source []byte, bucket, key, userId string, lc *lambdacontext.LambdaContext) (bool, string) {
+	anlogger.Debugf(lc, "internal_handle_upload.go : upload image to bucket [%s] with a key [%s] for userId [%s]", bucket, key, userId)
+	_, err := uploader.Upload(&s3manager.UploadInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+		Body:   bytes.NewReader(source),
+		ACL:    aws.String("public-read"),
+	})
+	if err != nil {
+		anlogger.Errorf(lc, "internal_handle_upload.go : error upload image to bucket [%s] with a key [%s] for userId [%s] : %v", bucket, key, userId, err)
+		return false, apimodel.InternalServerError
+	}
+	anlogger.Debugf(lc, "internal_handle_upload.go : successfully uploaded image to bucket [%s] with a key [%s] for userId [%s]", bucket, key, userId)
+	return true, ""
+}
+
+//return result photo model, ok and error string
+func resizeImage(source []byte, resolution, originPhotoId, sourceKey, userId string, lc *lambdacontext.LambdaContext) (*apimodel.UserPhoto, bool, string) {
+	anlogger.Debugf(lc, "internal_handle_upload.go : resize image originPhotoId [%s] using size [%s] for userId [%s]",
+		originPhotoId, resolution, userId)
+
+	img, err := jpeg.Decode(bytes.NewReader(source))
+	if err != nil {
+		anlogger.Errorf(lc, "internal_handle_upload.go : error resize image originPhotoId [%s] using size [%s] for userId [%s] : %v",
+			originPhotoId, resolution, userId, err)
+		return nil, false, apimodel.InternalServerError
+	}
+
+	width := apimodel.ResolutionValues[resolution+"_width"]
+	height := apimodel.ResolutionValues[resolution+"_height"]
+
+	m := resize.Resize(width, height, img, resize.Lanczos3)
+
+	out := bytes.Buffer{}
+	outWriter := bufio.NewWriter(&out)
+	err = jpeg.Encode(outWriter, m, nil)
+	if err != nil {
+		anlogger.Errorf(lc, "internal_handle_upload.go : error resize image originPhotoId [%s] using size [%s] for userId [%s] : %v",
+			originPhotoId, resolution, userId, err)
+		return nil, false, apimodel.InternalServerError
+	}
+	outWriter.Flush()
+
+	targetKey := resolution + "_" + sourceKey
+	targetContent := out.Bytes()
+	ok, errStr := uploadImage(targetContent, publicPhotoBucketName, targetKey, userId, lc)
+	if !ok {
+		return nil, false, errStr
+	}
+	link := fmt.Sprintf("https://s3-eu-west-1.amazonaws.com/%s/%s", publicPhotoBucketName, targetKey)
+	userPhoto := apimodel.UserPhoto{
+		UserId:         userId,
+		PhotoId:        resolution + "_" + originPhotoId,
+		PhotoType:      resolution,
+		Bucket:         publicPhotoBucketName,
+		Key:            targetKey,
+		Size:           int64(len(targetContent)),
+		PhotoSourceUri: link,
+	}
+	anlogger.Debugf(lc, "internal_handle_upload.go : successfully resize image, result %v for userId [%s]", userPhoto, userId)
+	return &userPhoto, true, ""
 }
 
 //return public link, ok and error string

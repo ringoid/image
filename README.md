@@ -39,9 +39,16 @@ Possible errorCodes:
 
 ### Get user's own photos
 
-* url ``https://{API ENDPOINT}/Prod/get_own_photos?accessToken={ACCESS TOKEN}&resolution=640x480``
+* url ``https://{API ENDPOINT}/Prod/get_own_photos?accessToken={ACCESS TOKEN}&resolution=480x640``
 
 GET request
+
+Allowed Sizes:
+
+* 480x640
+* 720x960
+* 1080x1440
+* 1440x1920
 
 Headers:
 
