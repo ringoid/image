@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"sort"
 	"math/rand"
+	"strings"
 )
 
 var anlogger *syslog.Logger
@@ -154,9 +155,10 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	ownPhotos := make([]apimodel.OwnPhoto, 0)
 	for _, value := range photos {
 		ownPhotos = append(ownPhotos, apimodel.OwnPhoto{
-			PhotoId:  value.PhotoId,
-			PhotoUri: value.PhotoSourceUri,
-			Likes:    value.Likes,
+			PhotoId:       value.PhotoId,
+			PhotoUri:      value.PhotoSourceUri,
+			Likes:         value.Likes,
+			OriginPhotoId: value.OriginPhotoId,
 		})
 	}
 	resp.Photos = ownPhotos
@@ -224,6 +226,7 @@ func getOwnPhotos(userId, resolution string, lc *lambdacontext.LambdaContext) ([
 
 	items := make([]*apimodel.UserPhoto, 0)
 	for _, v := range result.Items {
+		originPhotoId := strings.Replace(*v[apimodel.PhotoIdColumnName].S, resolution, "origin", 1)
 		items = append(items, &apimodel.UserPhoto{
 			UserId:         *v[apimodel.UserIdColumnName].S,
 			PhotoId:        *v[apimodel.PhotoIdColumnName].S,
@@ -232,6 +235,7 @@ func getOwnPhotos(userId, resolution string, lc *lambdacontext.LambdaContext) ([
 			Bucket:         *v[apimodel.PhotoBucketColumnName].S,
 			Key:            *v[apimodel.PhotoKeyColumnName].S,
 			UpdatedAt:      *v[apimodel.UpdatedTimeColumnName].S,
+			OriginPhotoId:  originPhotoId,
 		})
 	}
 	anlogger.Debugf(lc, "get_own_photos.go : successfully fetch [%v] photos for userId [%s] and resolution [%s], result=%v",

@@ -138,7 +138,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 			anlogger.Errorf(lc, "get_presigned_url.go : return %s to client", errStr)
 			return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 		}
-		s3Key = photoId + "." + reqParam.Extension
+		s3Key = photoId + "_photo." + reqParam.Extension
 		wasCreated, retry, errStr := createPhotoIdUserIdMapping(s3Key, userId, lc)
 		if !wasCreated && !needToRetry {
 			anlogger.Errorf(lc, "get_presigned_url.go : return %s to client", errStr)
@@ -157,7 +157,8 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	apimodel.SendAnalyticEvent(event, userId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
 
 	resp := apimodel.GetPresignUrlResp{
-		Uri: uri,
+		Uri:           uri,
+		OriginPhotoId: "origin_" + photoId,
 	}
 	body, err := json.Marshal(resp)
 	if err != nil {
@@ -233,7 +234,7 @@ func generatePhotoId(userId string, lc *lambdacontext.LambdaContext) (string, bo
 		anlogger.Errorf(lc, "get_presigned_url.go : error while write salt to sha algo, userId [%s] : %v", userId, err)
 		return "", false, apimodel.InternalServerError
 	}
-	resultPhotoId := fmt.Sprintf("%x_photo", sha.Sum(nil))
+	resultPhotoId := fmt.Sprintf("%x", sha.Sum(nil))
 	anlogger.Debugf(lc, "get_presigned_url.go : successfully generate photoId [%s] for userId [%s]", resultPhotoId, userId)
 	return resultPhotoId, true, ""
 }

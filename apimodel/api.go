@@ -33,11 +33,12 @@ func (req GetPresignUrlReq) String() string {
 
 type GetPresignUrlResp struct {
 	BaseResponse
-	Uri string `json:"uri"`
+	Uri           string `json:"uri"`
+	OriginPhotoId string `json:"originPhotoId"`
 }
 
 func (resp GetPresignUrlResp) GoString() string {
-	return fmt.Sprintf("[%v, GetPresignUrlResp={uri=%s}]", resp.BaseResponse, resp.Uri)
+	return fmt.Sprintf("[%v, GetPresignUrlResp={uri=%s, originPhotoId=%s}]", resp.BaseResponse, resp.Uri, resp.OriginPhotoId)
 }
 
 type MakePresignUrlInternalReq struct {
@@ -67,13 +68,14 @@ func (resp GetOwnPhotosResp) String() string {
 }
 
 type OwnPhoto struct {
-	PhotoId  string `json:"photoId"`
-	PhotoUri string `json:"photoUri"`
-	Likes    int    `json:"likes"`
+	PhotoId       string `json:"photoId"`
+	PhotoUri      string `json:"photoUri"`
+	Likes         int    `json:"likes"`
+	OriginPhotoId string `json:"originPhotoId"`
 }
 
 func (obj OwnPhoto) String() string {
-	return fmt.Sprintf("[OwnPhoto={photoId=%s, photoUri=%s, likes=%d}]", obj.PhotoId, obj.PhotoUri, obj.Likes)
+	return fmt.Sprintf("[OwnPhoto={photoId=%s, photoUri=%s, likes=%d, originPhotoId=%s}]", obj.PhotoId, obj.PhotoUri, obj.Likes, obj.OriginPhotoId)
 }
 
 type DeletePhotoReq struct {
