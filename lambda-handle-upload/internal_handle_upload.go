@@ -152,10 +152,10 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 	for _, record := range request.Records {
 		objectBucket := record.S3.Bucket.Name
 		objectKey := record.S3.Object.Key
-		decodedObjectKey := record.S3.Object.URLDecodedKey
 		objectSize := record.S3.Object.Size
-		anlogger.Debugf(lc, "internal_handle_upload.go : object was uploaded with bucket [%s], objectKey [%s], decodedObjectKey [%s], objectSize [%v]",
-			objectBucket, objectKey, decodedObjectKey, objectSize)
+
+		anlogger.Debugf(lc, "internal_handle_upload.go : object was uploaded with bucket [%s], objectKey [%s], objectSize [%v]",
+			objectBucket, objectKey, objectSize)
 
 		userId, ok, errStr := getOwner(objectKey, lc)
 		if !ok {
@@ -189,6 +189,7 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 		event := apimodel.NewUserUploadedPhotoEvent(userPhoto)
 		apimodel.SendAnalyticEvent(event, userPhoto.UserId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
 
+		//resizing
 		sourceImage, ok, errStr := getImage(objectBucket, objectKey, userId, lc)
 		if !ok {
 			return errors.New(errStr)

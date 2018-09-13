@@ -16,8 +16,8 @@ import (
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"sort"
-	"math/rand"
 	"strings"
+	"math/rand"
 )
 
 var anlogger *syslog.Logger
@@ -183,10 +183,11 @@ func makeFakeLikes(source []*apimodel.UserPhoto) {
 
 func sortOwnPhotos(source []*apimodel.UserPhoto) []*apimodel.UserPhoto {
 	sort.SliceStable(source, func(i, j int) bool {
-		if source[i].Likes == source[j].Likes {
-			return source[i].UpdatedAt > source[j].UpdatedAt
-		}
-		return source[i].Likes > source[j].Likes
+		return source[i].UpdatedAt > source[j].UpdatedAt
+		//if source[i].Likes == source[j].Likes {
+		//	return source[i].UpdatedAt > source[j].UpdatedAt
+		//}
+		//return source[i].Likes > source[j].Likes
 	})
 	return source
 }
