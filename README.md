@@ -1,6 +1,6 @@
 # Image Service
 
-### STAGE API ENDPOINT IS ``a9o3cw1o7j.execute-api.eu-west-1.amazonaws.com``
+### STAGE API ENDPOINT IS ``wlzvkc7yf5.execute-api.eu-west-1.amazonaws.com``
 ### PROD API ENDPOINT IS ````
 
 
