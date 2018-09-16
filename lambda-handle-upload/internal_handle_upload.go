@@ -21,7 +21,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/sqs"
-	"encoding/json"
 )
 
 var anlogger *syslog.Logger
@@ -204,7 +203,8 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 			height := apimodel.ResolutionValues[resolution+"_height"]
 			resizedPhotoId := resolution + "_" + originPhotoId
 			targetKey := resolution + "_" + objectKey
-			ok, errStr = asyncResize(userId, resizedPhotoId, resolution, objectBucket, objectKey, publicPhotoBucketName, targetKey, userPhotoTable, width, height, lc)
+			task := apimodel.NewResizePhotoAsyncTask(userId, resizedPhotoId, resolution, objectBucket, objectKey, publicPhotoBucketName, targetKey, userPhotoTable, width, height)
+			ok, errStr = apimodel.SendAsyncTask(task, asyncTaskQueue, userId, awsSqsClient, anlogger, lc)
 			if !ok {
 				return errors.New(errStr)
 			}
@@ -212,27 +212,6 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 	}
 	anlogger.Debugf(lc, "internal_handle_upload.go : successfully handle photo upload request %v", request)
 	return nil
-}
-
-//return ok and error string
-func asyncResize(userId, photoId, photoType, sourceBucket, sourceKey, targetBucket, targetKey, tableName string, targetWidth, targetHeight int, lc *lambdacontext.LambdaContext) (bool, string) {
-	anlogger.Debugf(lc, "internal_handle_upload.go : send async task to resize photoId [%s] with width [%d] and height [%d] for userId [%s]", photoId, targetWidth, targetWidth, userId)
-	task := apimodel.NewResizePhotoAsyncTask(userId, photoId, photoType, sourceBucket, sourceKey, targetBucket, targetKey, tableName, targetWidth, targetHeight)
-	body, err := json.Marshal(task)
-	if err != nil {
-		anlogger.Errorf(lc, "internal_handle_upload.go : error marshal task %v for userId [%s]: %v", task, userId, err)
-		return false, apimodel.InternalServerError
-	}
-	input := &sqs.SendMessageInput{
-		QueueUrl:    aws.String(asyncTaskQueue),
-		MessageBody: aws.String(string(body)),
-	}
-	_, err = awsSqsClient.SendMessage(input)
-	if err != nil {
-		anlogger.Errorf(lc, "internal_handle_upload.go : error sending async task %v to the queue for userId [%s] : %v", task, userId, err)
-		return false, apimodel.InternalServerError
-	}
-	return true, ""
 }
 
 //return userId (owner), was everything ok and error string

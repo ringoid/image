@@ -155,7 +155,8 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 			anlogger.Errorf(lc, "delete_photo.go : userId [%s], return %s to client", userId, errStr)
 			return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 		}
-		ok, errStr = asyncDel(userId, val, lc)
+		task := apimodel.NewRemovePhotoAsyncTask(userId, val, userPhotoTable)
+		ok, errStr = apimodel.SendAsyncTask(task, asyncTaskQueue, userId, awsSqsClient, anlogger, lc)
 		if !ok {
 			anlogger.Errorf(lc, "delete_photo.go : userId [%s], return %s to client", userId, errStr)
 			return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
@@ -189,27 +190,6 @@ func getAllPhotoIds(sourceId, userId string, lc *lambdacontext.LambdaContext) ([
 	}
 	anlogger.Debugf(lc, "delete_photo.go : successfully cretae del photo id list based on photoId [%s] for userId [%s], del list=%v", sourceId, userId, allIds)
 	return allIds, originPhotoId
-}
-
-//return ok and error string
-func asyncDel(userId, photoId string, lc *lambdacontext.LambdaContext) (bool, string) {
-	anlogger.Debugf(lc, "delete_photo.go : send async task to delete photoId [%s] for userId [%s]", photoId, userId)
-	task := apimodel.NewRemovePhotoAsyncTask(userId, photoId, userPhotoTable)
-	body, err := json.Marshal(task)
-	if err != nil {
-		anlogger.Errorf(lc, "delete_photo.go : error marshal task %v for userId [%s]: %v", task, userId, err)
-		return false, apimodel.InternalServerError
-	}
-	input := &sqs.SendMessageInput{
-		QueueUrl:    aws.String(asyncTaskQueue),
-		MessageBody: aws.String(string(body)),
-	}
-	_, err = awsSqsClient.SendMessage(input)
-	if err != nil {
-		anlogger.Errorf(lc, "delete_photo.go : error sending async task %v to the queue for userId [%s] : %v", task, userId, err)
-		return false, apimodel.InternalServerError
-	}
-	return true, ""
 }
 
 //return ok and error string

@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/firehose"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go/service/lambda"
+	"github.com/aws/aws-sdk-go/service/sqs"
 )
 
 //return userId, ok, error string
@@ -74,4 +75,25 @@ func SendAnalyticEvent(event interface{}, userId, deliveryStreamName string, aws
 	}
 
 	anlogger.Debugf(lc, "common_action.go : successfully send analytics event [%v] for userId [%s]", event, userId)
+}
+
+//return ok and error string
+func SendAsyncTask(task interface{}, asyncTaskQueue, userId string,
+	awsSqsClient *sqs.SQS, anlogger *syslog.Logger, lc *lambdacontext.LambdaContext) (bool, string) {
+	anlogger.Debugf(lc, "common_action.go : send async task %v for userId [%s]", task, userId)
+	body, err := json.Marshal(task)
+	if err != nil {
+		anlogger.Errorf(lc, "common_action.go : error marshal task %v for userId [%s]: %v", task, userId, err)
+		return false, InternalServerError
+	}
+	input := &sqs.SendMessageInput{
+		QueueUrl:    aws.String(asyncTaskQueue),
+		MessageBody: aws.String(string(body)),
+	}
+	_, err = awsSqsClient.SendMessage(input)
+	if err != nil {
+		anlogger.Errorf(lc, "common_action.go : error sending async task %v to the queue for userId [%s] : %v", task, userId, err)
+		return false, InternalServerError
+	}
+	return true, ""
 }

@@ -41,7 +41,6 @@ stage-deploy: stage-deploy-internal zip_lambda
 
 clean:
 	@echo '--- Delete old artifacts ---'
-	rm -rf auth-template-packaged.yaml
 	rm -rf get_presigned_url
 	rm -rf getpresigned-image.zip
 	cd image-java-internal && gradle clean
