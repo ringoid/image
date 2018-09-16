@@ -10,7 +10,7 @@ build:
 	@echo '--- Building delete-photo-image function ---'
 	GOOS=linux go build lambda-delete-photo/delete_photo.go
 	@echo '--- Building lambda-handle-task-image function ---'
-	GOOS=linux go build lambda-handle-task/internal_handle_task.go
+	GOOS=linux go build lambda-handle-task/internal_handle_task.go lambda-handle-task/remove_photo.go lambda-handle-task/resize_photo.go
 
 stage-deploy-internal:
 	@echo '--- Build and deploy PresignFunction to STAGE ---'

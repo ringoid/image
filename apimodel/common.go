@@ -68,7 +68,7 @@ const (
 )
 
 var AllowedPhotoResolution map[string]bool
-var ResolutionValues map[string]uint
+var ResolutionValues map[string]int
 
 type BaseResponse struct {
 	ErrorCode    string `json:"errorCode"`
@@ -86,7 +86,7 @@ func init() {
 	AllowedPhotoResolution["1080x1440"] = true
 	AllowedPhotoResolution["1440x1920"] = true
 
-	ResolutionValues = make(map[string]uint)
+	ResolutionValues = make(map[string]int)
 	ResolutionValues["480x640_width"] = 480
 	ResolutionValues["480x640_height"] = 640
 

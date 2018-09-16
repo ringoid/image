@@ -20,10 +20,8 @@ import (
 	"strconv"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"bytes"
-	"github.com/nfnt/resize"
-	"bufio"
-	"image/jpeg"
+	"github.com/aws/aws-sdk-go/service/sqs"
+	"encoding/json"
 )
 
 var anlogger *syslog.Logger
@@ -40,6 +38,8 @@ var userPhotoTable string
 var awsS3Client *s3.S3
 var downloader *s3manager.Downloader
 var uploader *s3manager.Uploader
+var awsSqsClient *sqs.SQS
+var asyncTaskQueue string
 
 func init() {
 	var env string
@@ -111,6 +111,13 @@ func init() {
 	}
 	anlogger.Debugf(nil, "internal_handle_upload.go : start with USER_PHOTO_TABLE = [%s]", userPhotoTable)
 
+	asyncTaskQueue, ok = os.LookupEnv("ASYNC_TASK_SQS_QUEUE")
+	if !ok {
+		fmt.Printf("internal_handle_upload.go : env can not be empty ASYNC_TASK_SQS_QUEUE")
+		os.Exit(1)
+	}
+	anlogger.Debugf(nil, "internal_handle_upload.go : start with ASYNC_TASK_SQS_QUEUE = [%s]", asyncTaskQueue)
+
 	awsSession, err = session.NewSession(aws.NewConfig().
 		WithRegion(apimodel.Region).WithMaxRetries(apimodel.MaxRetries).
 		WithLogger(aws.LoggerFunc(func(args ...interface{}) { anlogger.AwsLog(args) })).WithLogLevel(aws.LogOff))
@@ -143,11 +150,14 @@ func init() {
 
 	awsDeliveryStreamClient = firehose.New(awsSession)
 	anlogger.Debugf(nil, "internal_handle_upload.go : firehose client was successfully initialized")
+
+	awsSqsClient = sqs.New(awsSession)
+	anlogger.Debugf(nil, "internal_handle_upload.go : sqs client was successfully initialized")
 }
 
 func handler(ctx context.Context, request events.S3Event) (error) {
 	lc, _ := lambdacontext.FromContext(ctx)
-	anlogger.Debugf(lc, "internal_handle_upload.go : start handle request %v", request)
+	anlogger.Debugf(lc, "internal_handle_upload.go : start handle upload photo request %v", request)
 
 	for _, record := range request.Records {
 		objectBucket := record.S3.Bucket.Name
@@ -189,132 +199,40 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 		event := apimodel.NewUserUploadedPhotoEvent(userPhoto)
 		apimodel.SendAnalyticEvent(event, userPhoto.UserId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
 
-		//resizing
-		sourceImage, ok, errStr := getImage(objectBucket, objectKey, userId, lc)
-		if !ok {
-			return errors.New(errStr)
-		}
-
-		for mapkey, _ := range apimodel.AllowedPhotoResolution {
-			resultPhoto, ok, errStr := resizeImage(sourceImage, mapkey, originPhotoId, objectKey, userId, lc)
+		for resolution := range apimodel.AllowedPhotoResolution {
+			width := apimodel.ResolutionValues[resolution+"_width"]
+			height := apimodel.ResolutionValues[resolution+"_height"]
+			resizedPhotoId := resolution + "_" + originPhotoId
+			targetKey := resolution + "_" + objectKey
+			ok, errStr = asyncResize(userId, resizedPhotoId, resolution, objectBucket, objectKey, publicPhotoBucketName, targetKey, userPhotoTable, width, height, lc)
 			if !ok {
 				return errors.New(errStr)
 			}
-			ok, errStr = savePhoto(resultPhoto, lc)
-			if !ok {
-				return errors.New(errStr)
-			}
-			anlogger.Infof(lc, "internal_handle_upload.go : successfully save [%s] photo %v for userId [%s]", mapkey, userPhoto, userPhoto.UserId)
 		}
 	}
-
+	anlogger.Debugf(lc, "internal_handle_upload.go : successfully handle photo upload request %v", request)
 	return nil
 }
 
-//return image, ok and error string
-func getImage(bucket, key, userId string, lc *lambdacontext.LambdaContext) ([]byte, bool, string) {
-	anlogger.Debugf(lc, "internal_handle_upload.go : get image from bucket [%s] with a key [%s] for userId [%s]", bucket, key, userId)
-
-	buff := &aws.WriteAtBuffer{}
-	_, err := downloader.Download(buff, &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	})
-	if err != nil {
-		anlogger.Errorf(lc, "internal_handle_upload.go : error downloading image from bucket [%s] with a key [%s] for userId [%s] : %v",
-			bucket, key, userId, err)
-		return nil, false, apimodel.InternalServerError
-	}
-	anlogger.Debugf(lc, "internal_handle_upload.go : successfully got image from bucket [%s] with a key [%s] for userId [%s]", bucket, key, userId)
-	return buff.Bytes(), true, ""
-}
-
 //return ok and error string
-func uploadImage(source []byte, bucket, key, userId string, lc *lambdacontext.LambdaContext) (bool, string) {
-	anlogger.Debugf(lc, "internal_handle_upload.go : upload image to bucket [%s] with a key [%s] for userId [%s]", bucket, key, userId)
-	_, err := uploader.Upload(&s3manager.UploadInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-		Body:   bytes.NewReader(source),
-		ACL:    aws.String("public-read"),
-	})
+func asyncResize(userId, photoId, photoType, sourceBucket, sourceKey, targetBucket, targetKey, tableName string, targetWidth, targetHeight int, lc *lambdacontext.LambdaContext) (bool, string) {
+	anlogger.Debugf(lc, "internal_handle_upload.go : send async task to resize photoId [%s] with width [%d] and height [%d] for userId [%s]", photoId, targetWidth, targetWidth, userId)
+	task := apimodel.NewResizePhotoAsyncTask(userId, photoId, photoType, sourceBucket, sourceKey, targetBucket, targetKey, tableName, targetWidth, targetHeight)
+	body, err := json.Marshal(task)
 	if err != nil {
-		anlogger.Errorf(lc, "internal_handle_upload.go : error upload image to bucket [%s] with a key [%s] for userId [%s] : %v", bucket, key, userId, err)
+		anlogger.Errorf(lc, "internal_handle_upload.go : error marshal task %v for userId [%s]: %v", task, userId, err)
 		return false, apimodel.InternalServerError
 	}
-	anlogger.Debugf(lc, "internal_handle_upload.go : successfully uploaded image to bucket [%s] with a key [%s] for userId [%s]", bucket, key, userId)
+	input := &sqs.SendMessageInput{
+		QueueUrl:    aws.String(asyncTaskQueue),
+		MessageBody: aws.String(string(body)),
+	}
+	_, err = awsSqsClient.SendMessage(input)
+	if err != nil {
+		anlogger.Errorf(lc, "internal_handle_upload.go : error sending async task %v to the queue for userId [%s] : %v", task, userId, err)
+		return false, apimodel.InternalServerError
+	}
 	return true, ""
-}
-
-//return result photo model, ok and error string
-func resizeImage(source []byte, resolution, originPhotoId, sourceKey, userId string, lc *lambdacontext.LambdaContext) (*apimodel.UserPhoto, bool, string) {
-	anlogger.Debugf(lc, "internal_handle_upload.go : resize image originPhotoId [%s] using size [%s] for userId [%s]",
-		originPhotoId, resolution, userId)
-
-	img, err := jpeg.Decode(bytes.NewReader(source))
-	if err != nil {
-		anlogger.Errorf(lc, "internal_handle_upload.go : error resize image originPhotoId [%s] using size [%s] for userId [%s] : %v",
-			originPhotoId, resolution, userId, err)
-		return nil, false, apimodel.InternalServerError
-	}
-
-	width := apimodel.ResolutionValues[resolution+"_width"]
-	height := apimodel.ResolutionValues[resolution+"_height"]
-
-	m := resize.Resize(width, height, img, resize.Lanczos3)
-
-	out := bytes.Buffer{}
-	outWriter := bufio.NewWriter(&out)
-	err = jpeg.Encode(outWriter, m, nil)
-	if err != nil {
-		anlogger.Errorf(lc, "internal_handle_upload.go : error resize image originPhotoId [%s] using size [%s] for userId [%s] : %v",
-			originPhotoId, resolution, userId, err)
-		return nil, false, apimodel.InternalServerError
-	}
-	outWriter.Flush()
-
-	targetKey := resolution + "_" + sourceKey
-	targetContent := out.Bytes()
-	ok, errStr := uploadImage(targetContent, publicPhotoBucketName, targetKey, userId, lc)
-	if !ok {
-		return nil, false, errStr
-	}
-	link := fmt.Sprintf("https://s3-eu-west-1.amazonaws.com/%s/%s", publicPhotoBucketName, targetKey)
-	userPhoto := apimodel.UserPhoto{
-		UserId:         userId,
-		PhotoId:        resolution + "_" + originPhotoId,
-		PhotoType:      resolution,
-		Bucket:         publicPhotoBucketName,
-		Key:            targetKey,
-		Size:           int64(len(targetContent)),
-		PhotoSourceUri: link,
-	}
-	anlogger.Debugf(lc, "internal_handle_upload.go : successfully resize image, result %v for userId [%s]", userPhoto, userId)
-	return &userPhoto, true, ""
-}
-
-//return public link, ok and error string
-func transformImage(targetBucket, targetKey, sourceBucket, sourceKey, userId string, lc *lambdacontext.LambdaContext) (string, bool, string) {
-	anlogger.Debugf(lc, "internal_handle_upload.go : copy [%s/%s] to [%s/%s] for userId [%s]",
-		sourceBucket, sourceKey, targetBucket, targetKey, userId)
-	_, err := awsS3Client.CopyObject(&s3.CopyObjectInput{Bucket: aws.String(targetBucket),
-		CopySource: aws.String(sourceBucket + "/" + sourceKey), Key: aws.String(targetKey), ACL: aws.String("public-read")})
-	if err != nil {
-		anlogger.Errorf(lc, "internal_handle_upload.go : error copy [%s/%s] to [%s/%s] for userId [%s] : %v",
-			sourceBucket, sourceKey, targetBucket, targetKey, userId, err)
-		return "", false, apimodel.InternalServerError
-	}
-	err = awsS3Client.WaitUntilObjectExists(&s3.HeadObjectInput{Bucket: aws.String(targetBucket), Key: aws.String(targetKey)})
-	if err != nil {
-		anlogger.Errorf(lc, "internal_handle_upload.go : error waiting while copy [%s/%s] to [%s/%s] for userId [%s] complete : %v",
-			sourceBucket, sourceKey, targetBucket, targetKey, userId, err)
-		return "", false, apimodel.InternalServerError
-	}
-	link := fmt.Sprintf("https://s3-eu-west-1.amazonaws.com/%s/%s", targetBucket, targetKey)
-	anlogger.Debugf(lc, "internal_handle_upload.go : successfully copy [%s/%s] to [%s/%s] with public link [%s] for userId [%s]",
-		sourceBucket, sourceKey, targetBucket, targetKey, link, userId)
-
-	return link, true, ""
 }
 
 //return userId (owner), was everything ok and error string
