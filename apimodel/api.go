@@ -23,22 +23,24 @@ func (resp InternalGetUserIdResp) String() string {
 }
 
 type GetPresignUrlReq struct {
-	AccessToken string `json:"accessToken"`
-	Extension   string `json:"extension"`
+	AccessToken   string `json:"accessToken"`
+	Extension     string `json:"extension"`
+	ClientPhotoId string `json:"clientPhotoId"`
 }
 
 func (req GetPresignUrlReq) String() string {
-	return fmt.Sprintf("[GetPresignUrlReq={accessToken=%s, extension=%s}]", req.AccessToken, req.Extension)
+	return fmt.Sprintf("[GetPresignUrlReq={accessToken=%s, extension=%s, clientPhotoId=%s}]", req.AccessToken, req.Extension, req.ClientPhotoId)
 }
 
 type GetPresignUrlResp struct {
 	BaseResponse
 	Uri           string `json:"uri"`
 	OriginPhotoId string `json:"originPhotoId"`
+	ClientPhotoId string `json:"clientPhotoId"`
 }
 
 func (resp GetPresignUrlResp) GoString() string {
-	return fmt.Sprintf("[%v, GetPresignUrlResp={uri=%s, originPhotoId=%s}]", resp.BaseResponse, resp.Uri, resp.OriginPhotoId)
+	return fmt.Sprintf("[%v, GetPresignUrlResp={uri=%s, originPhotoId=%s, clientId=%s}]", resp.BaseResponse, resp.Uri, resp.OriginPhotoId, resp.ClientPhotoId)
 }
 
 type MakePresignUrlInternalReq struct {

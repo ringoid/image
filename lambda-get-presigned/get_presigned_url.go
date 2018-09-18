@@ -139,7 +139,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 			return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 		}
 		s3Key = photoId + "_photo." + reqParam.Extension
-		wasCreated, retry, errStr := createPhotoIdUserIdMapping(s3Key, userId, lc)
+		wasCreated, retry, errStr := createPhotoIdUserIdMapping(s3Key, userId, reqParam.ClientPhotoId, lc)
 		if !wasCreated && !needToRetry {
 			anlogger.Errorf(lc, "get_presigned_url.go : return %s to client", errStr)
 			return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
@@ -159,6 +159,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	resp := apimodel.GetPresignUrlResp{
 		Uri:           uri,
 		OriginPhotoId: "origin_" + photoId,
+		ClientPhotoId: reqParam.ClientPhotoId,
 	}
 	body, err := json.Marshal(resp)
 	if err != nil {
@@ -171,14 +172,15 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 }
 
 //return was mapping created, need to retry and error string
-func createPhotoIdUserIdMapping(photoId, userId string, lc *lambdacontext.LambdaContext) (bool, bool, string) {
+func createPhotoIdUserIdMapping(photoId, userId, clientId string, lc *lambdacontext.LambdaContext) (bool, bool, string) {
 	anlogger.Debugf(lc, "get_presigned_url.go : create mapping between photoId [%s] and userId [%s]", photoId, userId)
 
 	input :=
 		&dynamodb.UpdateItemInput{
 			ExpressionAttributeNames: map[string]*string{
-				"#userId": aws.String(apimodel.UserIdColumnName),
-				"#time":   aws.String(apimodel.UpdatedTimeColumnName),
+				"#userId":   aws.String(apimodel.UserIdColumnName),
+				"#time":     aws.String(apimodel.UpdatedTimeColumnName),
+				"#clientId": aws.String(apimodel.PhotoClientId),
 			},
 			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 				":uV": {
@@ -186,6 +188,9 @@ func createPhotoIdUserIdMapping(photoId, userId string, lc *lambdacontext.Lambda
 				},
 				":tV": {
 					S: aws.String(time.Now().UTC().Format("2006-01-02-15-04-05.000")),
+				},
+				":cV": {
+					S: aws.String(clientId),
 				},
 			},
 			Key: map[string]*dynamodb.AttributeValue{
@@ -196,7 +201,7 @@ func createPhotoIdUserIdMapping(photoId, userId string, lc *lambdacontext.Lambda
 			ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%v)", apimodel.PhotoIdColumnName)),
 
 			TableName:        aws.String(photoUserMappingTableName),
-			UpdateExpression: aws.String("SET #userId = :uV, #time = :tV"),
+			UpdateExpression: aws.String("SET #userId = :uV, #time = :tV, #clientId = :cV"),
 		}
 
 	_, err := awsDbClient.UpdateItem(input)
@@ -250,6 +255,11 @@ func parseParams(params string, lc *lambdacontext.LambdaContext) (*apimodel.GetP
 
 	if req.Extension == "" {
 		anlogger.Errorf(lc, "get_presigned_url.go : wrong required param extension [%s]", req.Extension)
+		return nil, false, apimodel.WrongRequestParamsClientError
+	}
+
+	if req.ClientPhotoId == "" {
+		anlogger.Errorf(lc, "get_presigned_url.go : wrong required param clientPhotoId [%s]", req.ClientPhotoId)
 		return nil, false, apimodel.WrongRequestParamsClientError
 	}
 

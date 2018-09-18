@@ -18,7 +18,8 @@ Body:
 
     {
         "accessToken":"adasdasd-fadfs-sdffd",
-        "extension":"jpg"
+        "extension":"jpg",
+        "clientPhotoId":"sldfjlskdfj--;lfk;lf"
     }
     
     all parameters are required
@@ -29,7 +30,8 @@ Body:
         "errorCode":"",
         "errorMessage":"",
         "uri":"https://bla.com/bla",
-        "originPhotoId":"sdljfhsljkdhgsdkj"
+        "originPhotoId":"sdljfhsljkdhgsdkj",
+        "clientPhotoId":"sldfjlskdfj--;lfk;lf"
     }
     
 Possible errorCodes:
