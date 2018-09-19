@@ -190,8 +190,11 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 		}
 
 		//now construct photo object
-		originPhotoId := strings.Split(objectKey, "_photo")[0]
-		photoId := "origin_" + originPhotoId
+		arr := strings.Split(objectKey, "_photo")
+		originS3PhotoId := arr[0]
+		extension := arr[1]
+
+		photoId := "origin_" + originS3PhotoId
 
 		userPhoto := apimodel.UserPhoto{
 			UserId:    userId,
@@ -219,8 +222,8 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 		for resolution := range apimodel.AllowedPhotoResolution {
 			width := apimodel.ResolutionValues[resolution+"_width"]
 			height := apimodel.ResolutionValues[resolution+"_height"]
-			resizedPhotoId := resolution + "_" + originPhotoId
-			targetKey := resolution + "_" + objectKey
+			resizedPhotoId := resolution + "_" + originS3PhotoId
+			targetKey := originS3PhotoId + "_" + resolution + extension
 			task := apimodel.NewResizePhotoAsyncTask(userId, resizedPhotoId, resolution, objectBucket, objectKey, publicPhotoBucketName, targetKey, userPhotoTable, width, height)
 			ok, errStr = apimodel.SendAsyncTask(task, asyncTaskQueue, userId, awsSqsClient, anlogger, lc)
 			if !ok {
