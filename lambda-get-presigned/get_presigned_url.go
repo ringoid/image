@@ -139,7 +139,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 			return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 		}
 		s3Key = photoId + "_photo." + reqParam.Extension
-		wasCreated, retry, errStr := createPhotoIdUserIdMapping(s3Key, userId, reqParam.ClientPhotoId, lc)
+		wasCreated, retry, errStr := createPhotoIdUserIdMapping(s3Key, userId, lc)
 		if !wasCreated && !needToRetry {
 			anlogger.Errorf(lc, "get_presigned_url.go : return %s to client", errStr)
 			return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
@@ -172,15 +172,14 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 }
 
 //return was mapping created, need to retry and error string
-func createPhotoIdUserIdMapping(photoId, userId, clientId string, lc *lambdacontext.LambdaContext) (bool, bool, string) {
+func createPhotoIdUserIdMapping(photoId, userId string, lc *lambdacontext.LambdaContext) (bool, bool, string) {
 	anlogger.Debugf(lc, "get_presigned_url.go : create mapping between photoId [%s] and userId [%s]", photoId, userId)
 
 	input :=
 		&dynamodb.UpdateItemInput{
 			ExpressionAttributeNames: map[string]*string{
-				"#userId":   aws.String(apimodel.UserIdColumnName),
-				"#time":     aws.String(apimodel.UpdatedTimeColumnName),
-				"#clientId": aws.String(apimodel.PhotoClientId),
+				"#userId": aws.String(apimodel.UserIdColumnName),
+				"#time":   aws.String(apimodel.UpdatedTimeColumnName),
 			},
 			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 				":uV": {
@@ -188,9 +187,6 @@ func createPhotoIdUserIdMapping(photoId, userId, clientId string, lc *lambdacont
 				},
 				":tV": {
 					S: aws.String(time.Now().UTC().Format("2006-01-02-15-04-05.000")),
-				},
-				":cV": {
-					S: aws.String(clientId),
 				},
 			},
 			Key: map[string]*dynamodb.AttributeValue{
@@ -201,7 +197,7 @@ func createPhotoIdUserIdMapping(photoId, userId, clientId string, lc *lambdacont
 			ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%v)", apimodel.PhotoIdColumnName)),
 
 			TableName:        aws.String(photoUserMappingTableName),
-			UpdateExpression: aws.String("SET #userId = :uV, #time = :tV, #clientId = :cV"),
+			UpdateExpression: aws.String("SET #userId = :uV, #time = :tV"),
 		}
 
 	_, err := awsDbClient.UpdateItem(input)
