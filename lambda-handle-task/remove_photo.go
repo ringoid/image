@@ -9,7 +9,6 @@ import (
 	"../sys_log"
 	"encoding/json"
 	"errors"
-	"github.com/aws/aws-sdk-go/service/s3"
 )
 
 func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *syslog.Logger) error {
@@ -24,7 +23,7 @@ func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *syslog.
 		return errors.New(errStr)
 	}
 
-	ok, errStr = deleteFromS3(userPhoto.Bucket, userPhoto.Key, rTask.UserId, lc, anlogger)
+	ok, errStr = apimodel.DeleteFromS3(userPhoto.Bucket, userPhoto.Key, rTask.UserId, awsS3Client, lc, anlogger)
 	if !ok {
 		return errors.New(errStr)
 	}
@@ -72,28 +71,6 @@ func getUserPhoto(userId, photoId, tableName string, lc *lambdacontext.LambdaCon
 		res, userId, photoId, tableName)
 
 	return &res, true, ""
-}
-
-//return ok and error string
-func deleteFromS3(bucket, key, userId string, lc *lambdacontext.LambdaContext, anlogger *syslog.Logger) (bool, string) {
-	anlogger.Debugf(lc, "remove_photo.go : delete from s3 bucket [%s] with key [%s] for userId [%s]",
-		bucket, key, userId)
-
-	input := &s3.DeleteObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	}
-
-	_, err := awsS3Client.DeleteObject(input)
-	if err != nil {
-		anlogger.Errorf(lc, "remove_photo.go : error delete from s3 bucket [%s] with key [%s] for userId [%s] : %v",
-			bucket, key, userId, err)
-		return false, apimodel.InternalServerError
-	}
-
-	anlogger.Debugf(lc, "remove_photo.go : successfully delete from s3 bucket [%s] with key [%s] for userId [%s]",
-		bucket, key, userId)
-	return true, ""
 }
 
 //return ok and error string

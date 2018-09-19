@@ -43,6 +43,8 @@ var asyncTaskQueue string
 var commonStreamName string
 var awsKinesisClient *kinesis.Kinesis
 
+const defaultMaxPhotoSize = 20000000 //20 Mb
+
 func init() {
 	var env string
 	var ok bool
@@ -186,6 +188,19 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 
 		//it means that there is no owner for this photo
 		if userId == "" {
+			return nil
+		}
+
+		if objectSize >= defaultMaxPhotoSize {
+			anlogger.Warnf(lc, "internal_handle_upload.go : uploaded object to big, bucket [%s], objectKey [%s], objectSize [%v] for userId [%s]",
+				objectBucket, objectKey, objectSize, userId)
+			task := apimodel.NewRemoveS3ObjectAsyncTask(objectBucket, objectKey)
+			ok, errStr = apimodel.SendAsyncTask(task, asyncTaskQueue, userId, awsSqsClient, anlogger, lc)
+			if !ok {
+				return errors.New(errStr)
+			}
+			event := apimodel.NewRemoveTooLargeObjectEvent(userId, objectBucket, objectKey, objectSize)
+			apimodel.SendAnalyticEvent(event, userId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
 			return nil
 		}
 

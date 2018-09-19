@@ -3,8 +3,9 @@ package apimodel
 import "fmt"
 
 const (
-	RemovePhotoTaskType = "REMOVE_PHOTO"
-	ResizePhotoTaskType = "RESIZE_PHOTO"
+	RemovePhotoTaskType    = "REMOVE_PHOTO"
+	ResizePhotoTaskType    = "RESIZE_PHOTO"
+	RemoveS3ObjectTaskType = "REMOVE_S3_OBJECT"
 )
 
 type AsyncTask struct {
@@ -33,6 +34,24 @@ func NewRemovePhotoAsyncTask(userId, photoId, tableName string) *RemovePhotoAsyn
 		UserId:    userId,
 		PhotoId:   photoId,
 		TableName: tableName,
+	}
+}
+
+type RemoveS3ObjectAsyncTask struct {
+	TaskType string `json:"taskType"`
+	Bucket   string `json:"bucket"`
+	Key      string `json:"key"`
+}
+
+func (task RemoveS3ObjectAsyncTask) String() string {
+	return fmt.Sprintf("[RemoveS3ObjectAsyncTask={taskType=%s, bucket=%s, key=%s}]", task.TaskType, task.Bucket, task.Key)
+}
+
+func NewRemoveS3ObjectAsyncTask(bucket, key string) *RemoveS3ObjectAsyncTask {
+	return &RemoveS3ObjectAsyncTask{
+		TaskType: RemoveS3ObjectTaskType,
+		Bucket:   bucket,
+		Key:      key,
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/kinesis"
+	"github.com/aws/aws-sdk-go/service/s3"
 )
 
 //return userId, ok, error string
@@ -119,5 +120,27 @@ func SendAsyncTask(task interface{}, asyncTaskQueue, userId string,
 		anlogger.Errorf(lc, "common_action.go : error sending async task %v to the queue for userId [%s] : %v", task, userId, err)
 		return false, InternalServerError
 	}
+	return true, ""
+}
+
+//return ok and error string
+func DeleteFromS3(bucket, key, userId string, awsS3Client *s3.S3, lc *lambdacontext.LambdaContext, anlogger *syslog.Logger) (bool, string) {
+	anlogger.Debugf(lc, "common_action.go : delete from s3 bucket [%s] with key [%s] for userId [%s]",
+		bucket, key, userId)
+
+	input := &s3.DeleteObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	}
+
+	_, err := awsS3Client.DeleteObject(input)
+	if err != nil {
+		anlogger.Errorf(lc, "common_action.go : error delete from s3 bucket [%s] with key [%s] for userId [%s] : %v",
+			bucket, key, userId, err)
+		return false, InternalServerError
+	}
+
+	anlogger.Debugf(lc, "common_action.go : successfully delete from s3 bucket [%s] with key [%s] for userId [%s]",
+		bucket, key, userId)
 	return true, ""
 }

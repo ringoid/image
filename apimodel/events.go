@@ -75,3 +75,28 @@ func NewUserDeletePhotoEvent(userId, photoId string) *UserDeletePhotoEvent {
 		EventType: "IMAGE_USER_DELETE_PHOTO",
 	}
 }
+
+type RemoveTooLargeObjectEvent struct {
+	UserId    string `json:"userId"`
+	Bucket    string `json:"bucket"`
+	Key       string `json:"key"`
+	Size      int64  `json:"size"`
+	UnixTime  int64  `json:"unixTime"`
+	EventType string `json:"eventType"`
+}
+
+func (event RemoveTooLargeObjectEvent) String() string {
+	return fmt.Sprintf("[RemoveTooLargeObjectEvent={userId=%s, bucket=%s, key=%s, size=%v, unixTime=%v, eventType=%s}]",
+		event.UserId, event.Bucket, event.Key, event.Size, event.UnixTime, event.EventType)
+}
+
+func NewRemoveTooLargeObjectEvent(userId, bucket, key string, size int64) *RemoveTooLargeObjectEvent {
+	return &RemoveTooLargeObjectEvent{
+		UserId:    userId,
+		Bucket:    bucket,
+		Key:       key,
+		Size:      size,
+		UnixTime:  time.Now().Unix(),
+		EventType: "IMAGE_REMOVE_TO_BIG_S3_OBJECT",
+	}
+}

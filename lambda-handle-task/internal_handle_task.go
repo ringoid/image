@@ -98,6 +98,11 @@ func handler(ctx context.Context, event events.SQSEvent) (error) {
 			if err != nil {
 				return err
 			}
+		case apimodel.RemoveS3ObjectTaskType:
+			err = removeS3Object([]byte(body), awsS3Client, lc, anlogger)
+			if err != nil {
+				return err
+			}
 		default:
 			return errors.New(fmt.Sprintf("unsuported taks type %s", aTask.TaskType))
 		}
