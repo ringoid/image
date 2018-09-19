@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go/service/kinesis"
 )
 
 //return userId, ok, error string
@@ -75,6 +76,29 @@ func SendAnalyticEvent(event interface{}, userId, deliveryStreamName string, aws
 	}
 
 	anlogger.Debugf(lc, "common_action.go : successfully send analytics event [%v] for userId [%s]", event, userId)
+}
+
+//ok and error string
+func SendCommonEvent(event interface{}, userId, commonStreamName string, awsKinesisClient *kinesis.Kinesis,
+	anlogger *syslog.Logger, lc *lambdacontext.LambdaContext) (bool, string) {
+	anlogger.Debugf(lc, "common_action.go : send common event [%v] for userId [%s]", event, userId)
+	data, err := json.Marshal(event)
+	if err != nil {
+		anlogger.Errorf(lc, "common_action.go : error marshaling common event [%v] for userId [%s] : %v", event, userId, err)
+		return false, InternalServerError
+	}
+	input := &kinesis.PutRecordInput{
+		StreamName:   aws.String(commonStreamName),
+		PartitionKey: aws.String(userId),
+		Data:         []byte(data),
+	}
+	_, err = awsKinesisClient.PutRecord(input)
+	if err != nil {
+		anlogger.Errorf(lc, "common_action.go : error putting common event into stream, event [%v] for userId [%s] : %v", event, userId, err)
+		return false, InternalServerError
+	}
+	anlogger.Debugf(lc, "common_action.go : successfully send common event [%v] for userId [%s]", event, userId)
+	return true, ""
 }
 
 //return ok and error string

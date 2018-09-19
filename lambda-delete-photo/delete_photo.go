@@ -19,6 +19,7 @@ import (
 	"strings"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go/service/kinesis"
 )
 
 var anlogger *syslog.Logger
@@ -33,6 +34,8 @@ var originPhotoBucketName string
 var userPhotoTable string
 var asyncTaskQueue string
 var awsSqsClient *sqs.SQS
+var commonStreamName string
+var awsKinesisClient *kinesis.Kinesis
 
 func init() {
 	var env string
@@ -125,6 +128,16 @@ func init() {
 	}
 	anlogger.Debugf(nil, "delete_photo.go : start with DELIVERY_STREAM = [%s]", deliveryStreamName)
 
+	commonStreamName, ok = os.LookupEnv("COMMON_STREAM")
+	if !ok {
+		anlogger.Fatalf(nil, "delete_photo.go : env can not be empty COMMON_STREAM")
+		os.Exit(1)
+	}
+	anlogger.Debugf(nil, "delete_photo.go : start with DELIVERY_STREAM = [%s]", commonStreamName)
+
+	awsKinesisClient = kinesis.New(awsSession)
+	anlogger.Debugf(nil, "delete_photo.go : kinesis client was successfully initialized")
+
 	awsDeliveryStreamClient = firehose.New(awsSession)
 	anlogger.Debugf(nil, "delete_photo.go : firehose client was successfully initialized")
 
@@ -166,6 +179,12 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	event := apimodel.NewUserDeletePhotoEvent(userId, originPhotoId)
 	apimodel.SendAnalyticEvent(event, userId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
 
+	ok, errStr = apimodel.SendCommonEvent(event, userId, commonStreamName, awsKinesisClient, anlogger, lc)
+	if !ok {
+		anlogger.Errorf(lc, "delete_photo.go : userId [%s], return %s to client", userId, errStr)
+		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+	}
+
 	resp := apimodel.BaseResponse{}
 	body, err := json.Marshal(resp)
 	if err != nil {
@@ -198,7 +217,7 @@ func markAsDel(userId, photoId string, lc *lambdacontext.LambdaContext) (bool, s
 	input :=
 		&dynamodb.UpdateItemInput{
 			ExpressionAttributeNames: map[string]*string{
-				"#deletedAt": aws.String(apimodel.PhotoDeletedAt),
+				"#deletedAt": aws.String(apimodel.PhotoDeletedAtColumnName),
 			},
 			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 				":deletedAtV": {

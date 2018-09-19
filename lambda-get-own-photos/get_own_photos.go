@@ -209,7 +209,7 @@ func getOwnPhotos(userId, resolution string, lc *lambdacontext.LambdaContext) ([
 				S: aws.String(resolution),
 			},
 		},
-		FilterExpression:       aws.String(fmt.Sprintf("attribute_not_exists(%s)", apimodel.PhotoDeletedAt)),
+		FilterExpression:       aws.String(fmt.Sprintf("attribute_not_exists(%s)", apimodel.PhotoDeletedAtColumnName)),
 		ConsistentRead:         aws.Bool(true),
 		KeyConditionExpression: aws.String("#userId = :userIdV AND begins_with(#photoId, :photoIdV)"),
 		TableName:              aws.String(userPhotoTable),

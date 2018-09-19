@@ -39,7 +39,7 @@ const (
 	PhotoBucketColumnName    = "photo_bucket"
 	PhotoKeyColumnName       = "photo_key"
 	PhotoSizeColumnName      = "photo_size"
-	PhotoDeletedAt           = "deleted_at"
+	PhotoDeletedAtColumnName = "deleted_at"
 
 	WhoCanSeePhotoColumnName      = "who_can_see_photo"
 	SafeDistanceInMeterColumnName = "safe_distance_in_meter"

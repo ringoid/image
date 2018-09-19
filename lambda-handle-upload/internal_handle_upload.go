@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go/service/kinesis"
 )
 
 var anlogger *syslog.Logger
@@ -39,6 +40,8 @@ var downloader *s3manager.Downloader
 var uploader *s3manager.Uploader
 var awsSqsClient *sqs.SQS
 var asyncTaskQueue string
+var commonStreamName string
+var awsKinesisClient *kinesis.Kinesis
 
 func init() {
 	var env string
@@ -150,6 +153,16 @@ func init() {
 	awsDeliveryStreamClient = firehose.New(awsSession)
 	anlogger.Debugf(nil, "internal_handle_upload.go : firehose client was successfully initialized")
 
+	commonStreamName, ok = os.LookupEnv("COMMON_STREAM")
+	if !ok {
+		anlogger.Fatalf(nil, "internal_handle_upload.go : env can not be empty COMMON_STREAM")
+		os.Exit(1)
+	}
+	anlogger.Debugf(nil, "internal_handle_upload.go : start with DELIVERY_STREAM = [%s]", commonStreamName)
+
+	awsKinesisClient = kinesis.New(awsSession)
+	anlogger.Debugf(nil, "internal_handle_upload.go : kinesis client was successfully initialized")
+
 	awsSqsClient = sqs.New(awsSession)
 	anlogger.Debugf(nil, "internal_handle_upload.go : sqs client was successfully initialized")
 }
@@ -197,6 +210,11 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 
 		event := apimodel.NewUserUploadedPhotoEvent(userPhoto)
 		apimodel.SendAnalyticEvent(event, userPhoto.UserId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
+
+		ok, errStr = apimodel.SendCommonEvent(event, userId, commonStreamName, awsKinesisClient, anlogger, lc)
+		if !ok {
+			return errors.New(errStr)
+		}
 
 		for resolution := range apimodel.AllowedPhotoResolution {
 			width := apimodel.ResolutionValues[resolution+"_width"]

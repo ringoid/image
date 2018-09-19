@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Image Service
+Description: Image Service Stack
 
 
 Mappings:
@@ -85,6 +85,9 @@ Globals:
             USER_PHOTO_TABLE: !Ref UserPhotoTable
             PUBLIC_PHOTO_BUCKET_NAME: !Join [ "-", [ !Ref Env, !Ref BasePublicPhotoBucketName] ]
             ASYNC_TASK_SQS_QUEUE: !Ref AsyncTaskSqsQueue
+            COMMON_STREAM:
+              Fn::ImportValue:
+                !Join [ "-", [ !Ref Env, CommonEventStreamExportName] ]
         Tags:
           Company: Ringoid
           Service: image
