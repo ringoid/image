@@ -141,4 +141,13 @@ Possible errorCodes:
 
 `{"userId":"aslkdl-asfmfa-asd","photoId":"aslkdl-asfmfa-asd","unixTime":1534338646,"eventType":"IMAGE_USER_DELETE_PHOTO"}`
 
+4. IMAGE_REMOVE_TO_BIG_S3_OBJECT
 
+* userId - string
+* bucket - string
+* key - string
+* size - int
+* unixTime - int
+* eventType - string (IMAGE_REMOVE_TO_BIG_S3_OBJECT)
+
+`{"userId":"aslkdl-asfmfa-asd","bucket":"bucket-name","key":"/foto.jpg","size":"1024","unixTime":1534338646,"eventType":"IMAGE_REMOVE_TO_BIG_S3_OBJECT"}`
