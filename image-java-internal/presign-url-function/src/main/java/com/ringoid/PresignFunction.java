@@ -18,6 +18,11 @@ public class PresignFunction {
     public Response handle(Request request) {
         log.info("handle request : {}", request);
 
+        if (request.getWarmUpRequest()) {
+            log.debug("it's warmup request");
+            return null;
+        }
+
         AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
                 .withRegion(REGION)
                 .build();

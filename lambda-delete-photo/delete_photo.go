@@ -149,6 +149,10 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 
 	anlogger.Debugf(lc, "delete_photo.go : start handle request %v", request)
 
+	if apimodel.IsItWarmUpRequest(request.Body, anlogger, lc) {
+		return events.APIGatewayProxyResponse{}, nil
+	}
+
 	reqParam, ok, errStr := parseParams(request.Body, lc)
 	if !ok {
 		anlogger.Errorf(lc, "delete_photo.go : return %s to client", errStr)

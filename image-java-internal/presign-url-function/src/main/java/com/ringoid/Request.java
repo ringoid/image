@@ -1,6 +1,7 @@
 package com.ringoid;
 
 public class Request {
+    private Boolean warmUpRequest;
     private String bucket;
     private String key;
 
@@ -20,10 +21,19 @@ public class Request {
         this.key = key;
     }
 
+    public Boolean getWarmUpRequest() {
+        return warmUpRequest;
+    }
+
+    public void setWarmUpRequest(Boolean warmUpRequest) {
+        this.warmUpRequest = warmUpRequest;
+    }
+
     @Override
     public String toString() {
         return "Request{" +
-                "bucket='" + bucket + '\'' +
+                "warmUpRequest='" + warmUpRequest + '\'' +
+                ", bucket='" + bucket + '\'' +
                 ", key='" + key + '\'' +
                 '}';
     }

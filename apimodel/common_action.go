@@ -10,6 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"strings"
+	"github.com/aws/aws-lambda-go/events"
 )
 
 //return userId, ok, error string
@@ -143,4 +145,54 @@ func DeleteFromS3(bucket, key, userId string, awsS3Client *s3.S3, lc *lambdacont
 	anlogger.Debugf(lc, "common_action.go : successfully delete from s3 bucket [%s] with key [%s] for userId [%s]",
 		bucket, key, userId)
 	return true, ""
+}
+
+func WarmUpLambda(functionName string, clientLambda *lambda.Lambda, anlogger *syslog.Logger, lc *lambdacontext.LambdaContext) {
+	anlogger.Debugf(lc, "common_action.go : warmup lambda [%s]", functionName)
+	req := WarmUpRequest{
+		WarmUpRequest: true,
+	}
+	jsonBody, err := json.Marshal(req)
+	if err != nil {
+		anlogger.Errorf(lc, "common_action.go : error marshaling req %v into json : %v", req, err)
+		return
+	}
+
+	apiReq := events.APIGatewayProxyRequest{
+		Body: string(jsonBody),
+	}
+
+	apiJsonBody, err := json.Marshal(apiReq)
+	if err != nil {
+		anlogger.Errorf(lc, "common_action.go : error marshaling req %v into json : %v", apiReq, err)
+		return
+	}
+
+	payload := apiJsonBody
+	if strings.Contains(functionName, "internal") {
+		payload = jsonBody
+	}
+	_, err = clientLambda.Invoke(&lambda.InvokeInput{FunctionName: aws.String(functionName), Payload: payload, InvocationType: aws.String("Event")})
+
+	if err != nil {
+		anlogger.Errorf(lc, "warm_up.go : error invoke function [%s] with body %s : %v", functionName, string(payload), err)
+		return
+	}
+
+	anlogger.Debugf(lc, "common_action.go : successfully warmup lambda [%s]", functionName)
+	return
+}
+
+func IsItWarmUpRequest(body string, anlogger *syslog.Logger, lc *lambdacontext.LambdaContext) bool {
+	anlogger.Debugf(lc, "common_action.go : is it warm up request, body [%s]", body)
+	var req WarmUpRequest
+	err := json.Unmarshal([]byte(body), &req)
+
+	if err != nil {
+		anlogger.Errorf(lc, "common_action.go : error unmarshal required params from the string %s : %v", body, err)
+		return false
+	}
+	result := req.WarmUpRequest
+	anlogger.Debugf(lc, "common_action.go : successfully check that it's warm up request, body [%s], result [%v]", body, result)
+	return result
 }

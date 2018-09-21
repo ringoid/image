@@ -47,6 +47,29 @@ Mappings:
       rcucrt: should-be-prod-value
       rcumin: should-be-prod-value
 
+  FunctionName:
+    GetPreSignedUrlFunction:
+      stage: stage-get-presigned-url-image
+      prod: prod-get-presigned-url-image
+    InternalHandleUploadFunction:
+      stage: stage-internal-handle-upload-image
+      prod: prod-internal-handle-upload-image
+    GetOwnPhotosFunction:
+      stage: stage-get-own-photos-image
+      prod: prod-get-own-photos-image
+    DeletePhotoFunction:
+      stage: stage-delete-photo-image
+      prod: prod-delete-photo-image
+    InternalHandleAsyncTaskFunction:
+      stage: stage-internal-handle-async-task-image
+      prod: prod-internal-handle-async-task-image
+    WarmUpFunction:
+      stage: stage-warm-up-image
+      prod: prod-warm-up-image
+    InternalPresignFunction:
+      stage: stage-internal-presign-url-image
+      prod: prod-internal-presign-url-image
+
 
 Parameters:
   Env:
@@ -88,6 +111,7 @@ Globals:
             COMMON_STREAM:
               Fn::ImportValue:
                 !Join [ "-", [ !Ref Env, CommonEventStreamExportName] ]
+            NEED_WARM_UP_LAMBDA_NAMES: !Join [ ",", [ !FindInMap [FunctionName, GetPreSignedUrlFunction, !Ref Env], !FindInMap [FunctionName, GetOwnPhotosFunction, !Ref Env], !FindInMap [FunctionName, DeletePhotoFunction, !Ref Env], !FindInMap [FunctionName, InternalPresignFunction, !Ref Env] ] ]
         Tags:
           Company: Ringoid
           Service: image
@@ -95,10 +119,47 @@ Globals:
 
 Resources:
 
+  WarmUpFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !FindInMap [FunctionName, WarmUpFunction, !Ref Env]
+      Handler: warm_up
+      CodeUri: ./warmup-image.zip
+      Description: WarmUp image function
+      Policies:
+        - AWSLambdaFullAccess
+
+  ScheduledWarmUpFunctionRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Scheduled WarmUp lambda function rule
+      ScheduleExpression: rate(8 minutes)
+      State: ENABLED
+      Name: !Join [ "-", [ !Ref Env, warm_up_image_function_rule] ]
+      Targets:
+        -
+          Arn:
+            Fn::GetAtt:
+              - WarmUpFunction
+              - Arn
+          Id: ScheduledWarmUpFunctionRuleId
+
+  PermissionForEventsToInvokeWarmUpFunction:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref WarmUpFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+          - ScheduledWarmUpFunctionRule
+          - Arn
+
+
   GetPreSignedUrlFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Join [ "-", [ !Ref Env, get-presigned-url-image] ]
+      FunctionName: !FindInMap [FunctionName, GetPreSignedUrlFunction, !Ref Env]
       Handler: get_presigned_url
       CodeUri: ./getpresigned-image.zip
       Description: Get Pre-Signed url image function
@@ -126,7 +187,7 @@ Resources:
   InternalHandleUploadFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Join [ "-", [ !Ref Env, internal-handle-upload-image] ]
+      FunctionName: !FindInMap [FunctionName, InternalHandleUploadFunction, !Ref Env]
       Handler: internal_handle_upload
       CodeUri: ./internal_handle_upload.zip
       Description: Handle uploaded images
@@ -158,7 +219,7 @@ Resources:
   GetOwnPhotosFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Join [ "-", [ !Ref Env, get-own-photos-image] ]
+      FunctionName: !FindInMap [FunctionName, GetOwnPhotosFunction, !Ref Env]
       Handler: get_own_photos
       CodeUri: ./get_own_photos.zip
       Description: Get all user's photos
@@ -175,7 +236,7 @@ Resources:
   DeletePhotoFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Join [ "-", [ !Ref Env, delete-photo-image] ]
+      FunctionName: !FindInMap [FunctionName, DeletePhotoFunction, !Ref Env]
       Handler: delete_photo
       CodeUri: ./delete_photo.zip
       Description: Delete user's photo
@@ -212,7 +273,7 @@ Resources:
   InternalHandleAsyncTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Join [ "-", [ !Ref Env, internal-handle-async-task-image] ]
+      FunctionName: !FindInMap [FunctionName, InternalHandleAsyncTaskFunction, !Ref Env]
       Handler: internal_handle_task
       CodeUri: ./internal_handle_task.zip
       Description: Handle async task from the queue

@@ -124,6 +124,10 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 
 	anlogger.Debugf(lc, "get_own_photos.go : start handle request %v", request)
 
+	if apimodel.IsItWarmUpRequest(request.Body, anlogger, lc) {
+		return events.APIGatewayProxyResponse{}, nil
+	}
+
 	accessToken := request.QueryStringParameters["accessToken"]
 	resolution := request.QueryStringParameters["resolution"]
 

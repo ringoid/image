@@ -11,6 +11,8 @@ build:
 	GOOS=linux go build lambda-delete-photo/delete_photo.go
 	@echo '--- Building lambda-handle-task-image function ---'
 	GOOS=linux go build lambda-handle-task/internal_handle_task.go lambda-handle-task/remove_photo.go lambda-handle-task/resize_photo.go lambda-handle-task/remove_s3_object.go
+	@echo '--- Building warmup-image function ---'
+	GOOS=linux go build lambda-warmup/warm_up.go
 
 stage-deploy-internal:
 	@echo '--- Build and deploy PresignFunction to STAGE ---'
@@ -31,6 +33,8 @@ zip_lambda: build
 	zip delete_photo.zip ./delete_photo
 	@echo '--- Zip internal-handle-task-image function ---'
 	zip internal_handle_task.zip ./internal_handle_task
+	@echo '--- Zip warmup-image function ---'
+	zip warmup-image.zip ./warm_up
 
 stage-deploy: stage-deploy-internal zip_lambda
 	@echo '--- Build lambda stage ---'
@@ -52,4 +56,6 @@ clean:
 	rm -rf delete_photo
 	rm -rf internal_handle_task.zip
 	rm -rf internal_handle_task
+	rm -rf warmup-image.zip
+	rm -rf warm_up
 

@@ -4,7 +4,16 @@ import (
 	"fmt"
 )
 
+type WarmUpRequest struct {
+	WarmUpRequest bool `json:"warmUpRequest"`
+}
+
+func (req WarmUpRequest) String() string {
+	return fmt.Sprintf("[WarmUpRequest={warmUpRequest=%s}]", req.WarmUpRequest)
+}
+
 type InternalGetUserIdReq struct {
+	WarmUpRequest bool `json:"warmUpRequest"`
 	AccessToken string `json:"accessToken"`
 }
 
@@ -23,6 +32,7 @@ func (resp InternalGetUserIdResp) String() string {
 }
 
 type GetPresignUrlReq struct {
+	WarmUpRequest bool `json:"warmUpRequest"`
 	AccessToken   string `json:"accessToken"`
 	Extension     string `json:"extension"`
 	ClientPhotoId string `json:"clientPhotoId"`
@@ -44,6 +54,7 @@ func (resp GetPresignUrlResp) GoString() string {
 }
 
 type MakePresignUrlInternalReq struct {
+	WarmUpRequest bool `json:"warmUpRequest"`
 	Bucket string `json:"bucket"`
 	Key    string `json:"key"`
 }
@@ -81,6 +92,7 @@ func (obj OwnPhoto) String() string {
 }
 
 type DeletePhotoReq struct {
+	WarmUpRequest bool `json:"warmUpRequest"`
 	AccessToken string `json:"accessToken"`
 	PhotoId     string `json:"photoId"`
 }

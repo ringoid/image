@@ -117,6 +117,10 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 
 	anlogger.Debugf(lc, "get_presigned_url.go : start handle request %v", request)
 
+	if apimodel.IsItWarmUpRequest(request.Body, anlogger, lc) {
+		return events.APIGatewayProxyResponse{}, nil
+	}
+
 	reqParam, ok, errStr := parseParams(request.Body, lc)
 	if !ok {
 		anlogger.Errorf(lc, "get_presigned_url.go : return %s to client", errStr)
