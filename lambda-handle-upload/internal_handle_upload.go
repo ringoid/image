@@ -191,18 +191,19 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 			return nil
 		}
 
-		if objectSize >= defaultMaxPhotoSize {
-			anlogger.Warnf(lc, "internal_handle_upload.go : uploaded object to big, bucket [%s], objectKey [%s], objectSize [%v] for userId [%s]",
-				objectBucket, objectKey, objectSize, userId)
-			task := apimodel.NewRemoveS3ObjectAsyncTask(objectBucket, objectKey)
-			ok, errStr = apimodel.SendAsyncTask(task, asyncTaskQueue, userId, awsSqsClient, anlogger, lc)
-			if !ok {
-				return errors.New(errStr)
-			}
-			event := apimodel.NewRemoveTooLargeObjectEvent(userId, objectBucket, objectKey, objectSize)
-			apimodel.SendAnalyticEvent(event, userId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
-			return nil
-		}
+		//todo: uncomment before prod
+		//if objectSize >= defaultMaxPhotoSize {
+		//	anlogger.Warnf(lc, "internal_handle_upload.go : uploaded object to big, bucket [%s], objectKey [%s], objectSize [%v] for userId [%s]",
+		//		objectBucket, objectKey, objectSize, userId)
+		//	task := apimodel.NewRemoveS3ObjectAsyncTask(objectBucket, objectKey)
+		//	ok, errStr = apimodel.SendAsyncTask(task, asyncTaskQueue, userId, awsSqsClient, anlogger, lc)
+		//	if !ok {
+		//		return errors.New(errStr)
+		//	}
+		//	event := apimodel.NewRemoveTooLargeObjectEvent(userId, objectBucket, objectKey, objectSize)
+		//	apimodel.SendAnalyticEvent(event, userId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
+		//	return nil
+		//}
 
 		//now construct photo object
 		arr := strings.Split(objectKey, "_photo")
