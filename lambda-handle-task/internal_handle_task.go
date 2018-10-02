@@ -88,17 +88,17 @@ func handler(ctx context.Context, event events.SQSEvent) (error) {
 			return errors.New(fmt.Sprintf("error unmarshal body %s : %v", body, err))
 		}
 		switch aTask.TaskType {
-		case apimodel.RemovePhotoTaskType:
+		case apimodel.ImageRemovePhotoTaskType:
 			err = removePhoto([]byte(body), lc, anlogger)
 			if err != nil {
 				return err
 			}
-		case apimodel.ResizePhotoTaskType:
+		case apimodel.ImageResizePhotoTaskType:
 			err = resizePhoto([]byte(body), downloader, uploader, awsDbClient, lc, anlogger)
 			if err != nil {
 				return err
 			}
-		case apimodel.RemoveS3ObjectTaskType:
+		case apimodel.ImageRemoveS3ObjectTaskType:
 			err = removeS3Object([]byte(body), awsS3Client, lc, anlogger)
 			if err != nil {
 				return err

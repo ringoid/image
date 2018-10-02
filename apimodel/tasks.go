@@ -3,9 +3,11 @@ package apimodel
 import "fmt"
 
 const (
-	RemovePhotoTaskType    = "REMOVE_PHOTO"
-	ResizePhotoTaskType    = "RESIZE_PHOTO"
-	RemoveS3ObjectTaskType = "REMOVE_S3_OBJECT"
+	ImageRemovePhotoTaskType    = "IMAGE_REMOVE_PHOTO"
+	ImageResizePhotoTaskType    = "IMAGE_RESIZE_PHOTO"
+	ImageRemoveS3ObjectTaskType = "IMAGE_REMOVE_S3_OBJECT"
+
+	AuthCheckVerificationCompeteTask = "AUTH_CHECK_VERIFICATION_COMPLETE"
 )
 
 type AsyncTask struct {
@@ -13,7 +15,7 @@ type AsyncTask struct {
 }
 
 func (task AsyncTask) String() string {
-	return fmt.Sprintf("[AsyncTask={taskType=%s}]", task)
+	return fmt.Sprintf("[AsyncTask={taskType=%s}]", task.TaskType)
 }
 
 type RemovePhotoAsyncTask struct {
@@ -30,7 +32,7 @@ func (task RemovePhotoAsyncTask) String() string {
 
 func NewRemovePhotoAsyncTask(userId, photoId, tableName string) *RemovePhotoAsyncTask {
 	return &RemovePhotoAsyncTask{
-		TaskType:  RemovePhotoTaskType,
+		TaskType:  ImageRemovePhotoTaskType,
 		UserId:    userId,
 		PhotoId:   photoId,
 		TableName: tableName,
@@ -49,7 +51,7 @@ func (task RemoveS3ObjectAsyncTask) String() string {
 
 func NewRemoveS3ObjectAsyncTask(bucket, key string) *RemoveS3ObjectAsyncTask {
 	return &RemoveS3ObjectAsyncTask{
-		TaskType: RemoveS3ObjectTaskType,
+		TaskType: ImageRemoveS3ObjectTaskType,
 		Bucket:   bucket,
 		Key:      key,
 	}
@@ -78,7 +80,7 @@ func (task ResizePhotoAsyncTask) String() string {
 
 func NewResizePhotoAsyncTask(userId, photoId, photoType, sourceBucket, sourceKey, targetBucket, targetKey, tableName string, targetWidth, targetHeight int) *ResizePhotoAsyncTask {
 	return &ResizePhotoAsyncTask{
-		TaskType:     ResizePhotoTaskType,
+		TaskType:     ImageResizePhotoTaskType,
 		UserId:       userId,
 		PhotoId:      photoId,
 		PhotoType:    photoType,
@@ -89,5 +91,21 @@ func NewResizePhotoAsyncTask(userId, photoId, photoType, sourceBucket, sourceKey
 		TargetBucket: targetBucket,
 		TargetKey:    targetKey,
 		TableName:    tableName,
+	}
+}
+
+type CheckVerificationCompleteTask struct {
+	Phone     string `json:"phone"`
+	TableName string `json:"tableName"`
+}
+
+func (task CheckVerificationCompleteTask) String() string {
+	return fmt.Sprintf("[CheckVerificationCompleteTask={phone=%s, tableName=%s}]", task.Phone, task.TableName)
+}
+
+func NewCheckVerificationCompleteTask(phone, table string) *CheckVerificationCompleteTask {
+	return &CheckVerificationCompleteTask{
+		Phone:     phone,
+		TableName: table,
 	}
 }

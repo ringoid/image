@@ -15,7 +15,7 @@ func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *syslog.
 	var rTask apimodel.RemovePhotoAsyncTask
 	err := json.Unmarshal([]byte(body), &rTask)
 	if err != nil {
-		anlogger.Errorf(lc, "remove_photo.go : error unmarshal body [%s] to RemovePhotoTaskType: %v", body, err)
+		anlogger.Errorf(lc, "remove_photo.go : error unmarshal body [%s] to ImageRemovePhotoTaskType: %v", body, err)
 		return errors.New(fmt.Sprintf("error unmarshal body %s : %v", body, err))
 	}
 	userPhoto, ok, errStr := getUserPhoto(rTask.UserId, rTask.PhotoId, rTask.TableName, lc, anlogger)

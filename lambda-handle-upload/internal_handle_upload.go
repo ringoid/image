@@ -241,7 +241,7 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 			resizedPhotoId := resolution + "_" + originS3PhotoId
 			targetKey := originS3PhotoId + "_" + resolution + extension
 			task := apimodel.NewResizePhotoAsyncTask(userId, resizedPhotoId, resolution, objectBucket, objectKey, publicPhotoBucketName, targetKey, userPhotoTable, width, height)
-			ok, errStr = apimodel.SendAsyncTask(task, asyncTaskQueue, userId, awsSqsClient, anlogger, lc)
+			ok, errStr = apimodel.SendAsyncTask(task, asyncTaskQueue, userId, 0, awsSqsClient, anlogger, lc)
 			if !ok {
 				return errors.New(errStr)
 			}
