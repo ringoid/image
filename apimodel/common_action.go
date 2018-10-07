@@ -14,12 +14,32 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"time"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"strconv"
 )
 
+func ParseAppVersionFromHeaders(headers map[string]string, anlogger *syslog.Logger, lc *lambdacontext.LambdaContext) (int, bool, string) {
+	anlogger.Debugf(lc, "common_action.go : parse app version from the headers %v", headers)
+	var appVersionInt int
+	var err error
+	if appVersionStr, ok := headers[AppVersionHeaderName]; !ok {
+		anlogger.Errorf(lc, "common_action.go : error header [%s] is empty", AppVersionHeaderName)
+		return 0, false, WrongRequestParamsClientError
+	} else {
+		appVersionInt, err = strconv.Atoi(appVersionStr)
+		if err != nil {
+			anlogger.Errorf(lc, "common_action.go : error converting header [%s] with value [%s] to int : %v", AppVersionHeaderName, appVersionStr, err)
+			return 0, false, WrongRequestParamsClientError
+		}
+	}
+	anlogger.Debugf(lc, "common_action.go : successfully parse app version [%d] from the headers %v", appVersionInt, headers)
+	return appVersionInt, true, ""
+}
+
 //return userId, ok, error string
-func CallVerifyAccessToken(accessToken, functionName string, clientLambda *lambda.Lambda, anlogger *syslog.Logger, lc *lambdacontext.LambdaContext) (string, bool, string) {
+func CallVerifyAccessToken(appVersion int, accessToken, functionName string, clientLambda *lambda.Lambda, anlogger *syslog.Logger, lc *lambdacontext.LambdaContext) (string, bool, string) {
 	req := InternalGetUserIdReq{
 		AccessToken: accessToken,
+		AppVersion:  appVersion,
 	}
 	jsonBody, err := json.Marshal(req)
 	if err != nil {
@@ -50,6 +70,8 @@ func CallVerifyAccessToken(accessToken, functionName string, clientLambda *lambd
 		switch response.ErrorCode {
 		case "InvalidAccessTokenClientError":
 			return "", false, InvalidAccessTokenClientError
+		case "TooOldAppVersionClientError":
+			return "", false, TooOldAppVersionClientError
 		default:
 			return "", false, InternalServerError
 		}

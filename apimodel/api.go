@@ -13,8 +13,9 @@ func (req WarmUpRequest) String() string {
 }
 
 type InternalGetUserIdReq struct {
-	WarmUpRequest bool `json:"warmUpRequest"`
-	AccessToken string `json:"accessToken"`
+	WarmUpRequest bool   `json:"warmUpRequest"`
+	AccessToken   string `json:"accessToken"`
+	AppVersion    int    `json:"appVersion"`
 }
 
 func (req InternalGetUserIdReq) String() string {
@@ -32,7 +33,7 @@ func (resp InternalGetUserIdResp) String() string {
 }
 
 type GetPresignUrlReq struct {
-	WarmUpRequest bool `json:"warmUpRequest"`
+	WarmUpRequest bool   `json:"warmUpRequest"`
 	AccessToken   string `json:"accessToken"`
 	Extension     string `json:"extension"`
 	ClientPhotoId string `json:"clientPhotoId"`
@@ -54,9 +55,9 @@ func (resp GetPresignUrlResp) GoString() string {
 }
 
 type MakePresignUrlInternalReq struct {
-	WarmUpRequest bool `json:"warmUpRequest"`
-	Bucket string `json:"bucket"`
-	Key    string `json:"key"`
+	WarmUpRequest bool   `json:"warmUpRequest"`
+	Bucket        string `json:"bucket"`
+	Key           string `json:"key"`
 }
 
 func (req MakePresignUrlInternalReq) String() string {
@@ -92,9 +93,9 @@ func (obj OwnPhoto) String() string {
 }
 
 type DeletePhotoReq struct {
-	WarmUpRequest bool `json:"warmUpRequest"`
-	AccessToken string `json:"accessToken"`
-	PhotoId     string `json:"photoId"`
+	WarmUpRequest bool   `json:"warmUpRequest"`
+	AccessToken   string `json:"accessToken"`
+	PhotoId       string `json:"photoId"`
 }
 
 func (req DeletePhotoReq) String() string {

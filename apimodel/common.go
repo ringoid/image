@@ -53,6 +53,8 @@ const (
 	AccessTokenUserIdClaim       = "userId"
 	AccessTokenSessionTokenClaim = "sessionToken"
 
+	AppVersionHeaderName = "X-Ringoid-App-Version"
+
 	InternalServerError           = `{"errorCode":"InternalServerError","errorMessage":"Internal Server Error"}`
 	WrongRequestParamsClientError = `{"errorCode":"WrongParamsClientError","errorMessage":"Wrong request params"}`
 	PhoneNumberClientError        = `{"errorCode":"PhoneNumberClientError","errorMessage":"Phone number is invalid"}`
@@ -65,6 +67,7 @@ const (
 	WrongYearOfBirthClientError   = `{"errorCode":"WrongYearOfBirthClientError","errorMessage":"Wrong year of birth"}`
 	WrongSexClientError           = `{"errorCode":"WrongSexClientError","errorMessage":"Wrong sex"}`
 	InvalidAccessTokenClientError = `{"errorCode":"InvalidAccessTokenClientError","errorMessage":"Invalid access token"}`
+	TooOldAppVersionClientError   = `{"errorCode":"TooOldAppVersionClientError","errorMessage":"Too old app version"}`
 )
 
 var AllowedPhotoResolution map[string]bool

@@ -12,6 +12,7 @@ POST request
 
 Headers:
 
+* X-Ringoid-App-Version : 1       //int
 * Content-Type : application/json
 
 Body:
@@ -39,10 +40,15 @@ Possible errorCodes:
 * InternalServerError
 * InvalidAccessTokenClientError
 * WrongRequestParamsClientError
+* TooOldAppVersionClientError
 
 ### Get user's own photos
 
 * url ``https://{API ENDPOINT}/Prod/get_own_photos?accessToken={ACCESS TOKEN}&resolution=480x640``
+
+Headers:
+
+* X-Ringoid-App-Version : 1       //int
 
 GET request
 
@@ -55,6 +61,7 @@ Allowed Sizes:
 
 Headers:
 
+* X-Ringoid-App-Version : 1       //int
 * Content-Type : application/json
 
  Response Body:
@@ -73,6 +80,7 @@ Possible errorCodes:
 * InternalServerError
 * WrongRequestParamsClientError
 * InvalidAccessTokenClientError
+* TooOldAppVersionClientError
 
 ### Delete user's photo
 
@@ -82,6 +90,7 @@ POST request
 
 Headers:
 
+* X-Ringoid-App-Version : 1       //int
 * Content-Type : application/json
 
 Body:
@@ -105,6 +114,7 @@ Possible errorCodes:
 * InternalServerError
 * InvalidAccessTokenClientError
 * WrongRequestParamsClientError
+* TooOldAppVersionClientError
 
 
 ## Analytics Events

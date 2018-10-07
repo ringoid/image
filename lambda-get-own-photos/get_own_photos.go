@@ -128,6 +128,12 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{}, nil
 	}
 
+	appVersion, ok, errStr := apimodel.ParseAppVersionFromHeaders(request.Headers, anlogger, lc)
+	if !ok {
+		anlogger.Errorf(lc, "delete_photo.go : return %s to client", errStr)
+		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+	}
+
 	accessToken := request.QueryStringParameters["accessToken"]
 	resolution := request.QueryStringParameters["resolution"]
 
@@ -138,7 +144,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	userId, ok, errStr := apimodel.CallVerifyAccessToken(accessToken, internalAuthFunctionName, clientLambda, anlogger, lc)
+	userId, ok, errStr := apimodel.CallVerifyAccessToken(appVersion, accessToken, internalAuthFunctionName, clientLambda, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "get_own_photos.go : return %s to client", errStr)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
