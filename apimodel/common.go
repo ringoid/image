@@ -53,7 +53,8 @@ const (
 	AccessTokenUserIdClaim       = "userId"
 	AccessTokenSessionTokenClaim = "sessionToken"
 
-	AppVersionHeaderName = "X-Ringoid-App-Version"
+	AndroidBuildNum = "X-Ringoid-Android-BuildNum"
+	iOSdBuildNum    = "X-Ringoid-iOS-BuildNum"
 
 	InternalServerError           = `{"errorCode":"InternalServerError","errorMessage":"Internal Server Error"}`
 	WrongRequestParamsClientError = `{"errorCode":"WrongParamsClientError","errorMessage":"Wrong request params"}`

@@ -17,29 +17,41 @@ import (
 	"strconv"
 )
 
-func ParseAppVersionFromHeaders(headers map[string]string, anlogger *syslog.Logger, lc *lambdacontext.LambdaContext) (int, bool, string) {
-	anlogger.Debugf(lc, "common_action.go : parse app version from the headers %v", headers)
+//return buildnum, is it android, ok and error string
+func ParseAppVersionFromHeaders(headers map[string]string, anlogger *syslog.Logger, lc *lambdacontext.LambdaContext) (int, bool, bool, string) {
+	anlogger.Debugf(lc, "common_action.go : parse build num from the headers %v", headers)
 	var appVersionInt int
 	var err error
-	if appVersionStr, ok := headers[AppVersionHeaderName]; !ok {
-		anlogger.Errorf(lc, "common_action.go : error header [%s] is empty", AppVersionHeaderName)
-		return 0, false, WrongRequestParamsClientError
-	} else {
+
+	if appVersionStr, ok := headers[AndroidBuildNum]; ok {
 		appVersionInt, err = strconv.Atoi(appVersionStr)
 		if err != nil {
-			anlogger.Errorf(lc, "common_action.go : error converting header [%s] with value [%s] to int : %v", AppVersionHeaderName, appVersionStr, err)
-			return 0, false, WrongRequestParamsClientError
+			anlogger.Errorf(lc, "common_action.go : error converting header [%s] with value [%s] to int : %v", AndroidBuildNum, appVersionStr, err)
+			return 0, false, false, WrongRequestParamsClientError
 		}
+		anlogger.Debugf(lc, "common_action.go : successfully parse Android build num [%d] from the headers %v", appVersionInt, headers)
+		return appVersionInt, true, true, ""
+
+	} else if appVersionStr, ok = headers[iOSdBuildNum]; ok {
+		appVersionInt, err = strconv.Atoi(appVersionStr)
+		if err != nil {
+			anlogger.Errorf(lc, "common_action.go : error converting header [%s] with value [%s] to int : %v", iOSdBuildNum, appVersionStr, err)
+			return 0, false, false, WrongRequestParamsClientError
+		}
+		anlogger.Debugf(lc, "common_action.go : successfully parse iOS build num [%d] from the headers %v", appVersionInt, headers)
+		return appVersionInt, false, true, ""
+	} else {
+		anlogger.Errorf(lc, "common_action.go : error header [%s] is empty", AndroidBuildNum)
+		return 0, false, false, WrongRequestParamsClientError
 	}
-	anlogger.Debugf(lc, "common_action.go : successfully parse app version [%d] from the headers %v", appVersionInt, headers)
-	return appVersionInt, true, ""
 }
 
 //return userId, ok, error string
-func CallVerifyAccessToken(appVersion int, accessToken, functionName string, clientLambda *lambda.Lambda, anlogger *syslog.Logger, lc *lambdacontext.LambdaContext) (string, bool, string) {
+func CallVerifyAccessToken(buildNum int, isItAndroid bool, accessToken, functionName string, clientLambda *lambda.Lambda, anlogger *syslog.Logger, lc *lambdacontext.LambdaContext) (string, bool, string) {
 	req := InternalGetUserIdReq{
 		AccessToken: accessToken,
-		AppVersion:  appVersion,
+		BuildNum:    buildNum,
+		IsItAndroid: isItAndroid,
 	}
 	jsonBody, err := json.Marshal(req)
 	if err != nil {

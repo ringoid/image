@@ -12,7 +12,7 @@ POST request
 
 Headers:
 
-* X-Ringoid-App-Version : 1       //int
+* X-Ringoid-Android-BuildNum : 1       //int, X-Ringoid-iOS-BuildNum in case of iOS
 * Content-Type : application/json
 
 Body:
@@ -48,7 +48,7 @@ Possible errorCodes:
 
 Headers:
 
-* X-Ringoid-App-Version : 1       //int
+* X-Ringoid-Android-BuildNum : 1       //int, X-Ringoid-iOS-BuildNum in case of iOS
 
 GET request
 
@@ -90,7 +90,7 @@ POST request
 
 Headers:
 
-* X-Ringoid-App-Version : 1       //int
+* X-Ringoid-Android-BuildNum : 1       //int, X-Ringoid-iOS-BuildNum in case of iOS
 * Content-Type : application/json
 
 Body:
