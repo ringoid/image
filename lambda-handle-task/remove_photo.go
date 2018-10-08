@@ -23,14 +23,17 @@ func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *syslog.
 		return errors.New(errStr)
 	}
 
-	ok, errStr = apimodel.DeleteFromS3(userPhoto.Bucket, userPhoto.Key, rTask.UserId, awsS3Client, lc, anlogger)
-	if !ok {
-		return errors.New(errStr)
-	}
+	//delete only resized photo and keep origin photo
+	if userPhoto.PhotoType != "origin" {
+		ok, errStr = apimodel.DeleteFromS3(userPhoto.Bucket, userPhoto.Key, rTask.UserId, awsS3Client, lc, anlogger)
+		if !ok {
+			return errors.New(errStr)
+		}
 
-	ok, errStr = deletePhotoFromDynamo(rTask.UserId, rTask.PhotoId, rTask.TableName, lc, anlogger)
-	if !ok {
-		return errors.New(errStr)
+		ok, errStr = deletePhotoFromDynamo(rTask.UserId, rTask.PhotoId, rTask.TableName, lc, anlogger)
+		if !ok {
+			return errors.New(errStr)
+		}
 	}
 	return nil
 }
