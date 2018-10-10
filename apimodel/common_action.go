@@ -265,3 +265,21 @@ func SendCloudWatchMetric(baseCloudWatchNamespace, metricName string, value int,
 	anlogger.Debugf(lc, "common_action.go : successfully send value [%d] for namespace [%s] and metric name [%s]", value, baseCloudWatchNamespace, metricName)
 	return true, ""
 }
+
+func GetOriginPhotoId(userId, sourcePhotoId string, anlogger *syslog.Logger, lc *lambdacontext.LambdaContext) (string, bool) {
+	anlogger.Debugf(lc, "common_action.go : get origin photo id based on source photo id [%s] for userId [%s]", sourcePhotoId, userId)
+	if len(sourcePhotoId) == 0 {
+		anlogger.Warnf(lc, "common_action.go : empty source photo id for userId [%s]", userId)
+		return "", false
+	}
+	arr := strings.Split(sourcePhotoId, "_")
+	if len(arr) != 2 {
+		anlogger.Warnf(lc, "common_action.go : wrong source photo id for userId [%s]", userId)
+		return "", false
+	}
+	baseId := arr[1]
+	originPhotoId := "origin_" + baseId
+	anlogger.Debugf(lc, "common_action.go : successfully get origin photo id [%s] for source photo id [%s] for userId [%s]",
+		originPhotoId, sourcePhotoId, userId)
+	return originPhotoId, true
+}

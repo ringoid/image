@@ -212,7 +212,7 @@ func getAllPhotoIds(sourceId, userId string, lc *lambdacontext.LambdaContext) ([
 	arr := strings.Split(sourceId, "_")
 	baseId := arr[1]
 	allIds := make([]string, 0)
-	originPhotoId := "origin_" + baseId
+	originPhotoId, _ := apimodel.GetOriginPhotoId(userId, sourceId, anlogger, lc)
 	allIds = append(allIds, originPhotoId)
 	for key, _ := range apimodel.AllowedPhotoResolution {
 		allIds = append(allIds, key+"_"+baseId)
