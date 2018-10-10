@@ -12,7 +12,7 @@ POST request
 
 Headers:
 
-* X-Ringoid-Android-BuildNum : 1       //int, X-Ringoid-iOS-BuildNum in case of iOS
+* x-ringoid-android-buildnum : 1       //int, x-ringoid-ios-buildnum in case of iOS
 * Content-Type : application/json
 
 Body:
@@ -46,10 +46,6 @@ Possible errorCodes:
 
 * url ``https://{API ENDPOINT}/Prod/get_own_photos?accessToken={ACCESS TOKEN}&resolution=480x640``
 
-Headers:
-
-* X-Ringoid-Android-BuildNum : 1       //int, X-Ringoid-iOS-BuildNum in case of iOS
-
 GET request
 
 Allowed Sizes:
@@ -61,7 +57,7 @@ Allowed Sizes:
 
 Headers:
 
-* X-Ringoid-App-Version : 1       //int
+* x-ringoid-android-buildnum : 1       //int, x-ringoid-ios-buildnum in case of iOS
 * Content-Type : application/json
 
  Response Body:
@@ -90,7 +86,7 @@ POST request
 
 Headers:
 
-* X-Ringoid-Android-BuildNum : 1       //int, X-Ringoid-iOS-BuildNum in case of iOS
+* x-ringoid-android-buildnum : 1       //int, x-ringoid-ios-buildnum in case of iOS
 * Content-Type : application/json
 
 Body:
