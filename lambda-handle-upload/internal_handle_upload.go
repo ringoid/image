@@ -230,7 +230,8 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 		event := apimodel.NewUserUploadedPhotoEvent(userPhoto)
 		apimodel.SendAnalyticEvent(event, userPhoto.UserId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
 
-		ok, errStr = apimodel.SendCommonEvent(event, userId, commonStreamName, awsKinesisClient, anlogger, lc)
+		partitionKey := userId
+		ok, errStr = apimodel.SendCommonEvent(event, userId, commonStreamName, partitionKey, awsKinesisClient, anlogger, lc)
 		if !ok {
 			return errors.New(errStr)
 		}
