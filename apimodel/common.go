@@ -40,6 +40,9 @@ const (
 	PhotoKeyColumnName       = "photo_key"
 	PhotoSizeColumnName      = "photo_size"
 	PhotoDeletedAtColumnName = "deleted_at"
+	PhotoLikesColumnName     = "likes"
+
+	PhotoPromaryKeyMetaPostfix = "_meta"
 
 	WhoCanSeePhotoColumnName      = "who_can_see_photo"
 	SafeDistanceInMeterColumnName = "safe_distance_in_meter"

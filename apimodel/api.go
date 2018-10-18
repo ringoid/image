@@ -9,7 +9,7 @@ type WarmUpRequest struct {
 }
 
 func (req WarmUpRequest) String() string {
-	return fmt.Sprintf("[WarmUpRequest={warmUpRequest=%s}]", req.WarmUpRequest)
+	return fmt.Sprintf("%#v", req)
 }
 
 type InternalGetUserIdReq struct {
@@ -20,7 +20,7 @@ type InternalGetUserIdReq struct {
 }
 
 func (req InternalGetUserIdReq) String() string {
-	return fmt.Sprintf("[InternalGetUserIdReq={accessToken=%s}]", req.AccessToken)
+	return fmt.Sprintf("%#v", req)
 }
 
 type InternalGetUserIdResp struct {
@@ -29,8 +29,7 @@ type InternalGetUserIdResp struct {
 }
 
 func (resp InternalGetUserIdResp) String() string {
-	return fmt.Sprintf("[%v, InternalGetUserIdResp={userId=%s}]",
-		resp.BaseResponse, resp.UserId)
+	return fmt.Sprintf("%#v", resp)
 }
 
 type GetPresignUrlReq struct {
@@ -41,7 +40,7 @@ type GetPresignUrlReq struct {
 }
 
 func (req GetPresignUrlReq) String() string {
-	return fmt.Sprintf("[GetPresignUrlReq={accessToken=%s, extension=%s, clientPhotoId=%s}]", req.AccessToken, req.Extension, req.ClientPhotoId)
+	return fmt.Sprintf("%#v", req)
 }
 
 type GetPresignUrlResp struct {
@@ -52,7 +51,7 @@ type GetPresignUrlResp struct {
 }
 
 func (resp GetPresignUrlResp) GoString() string {
-	return fmt.Sprintf("[%v, GetPresignUrlResp={uri=%s, originPhotoId=%s, clientId=%s}]", resp.BaseResponse, resp.Uri, resp.OriginPhotoId, resp.ClientPhotoId)
+	return fmt.Sprintf("%#v", resp)
 }
 
 type MakePresignUrlInternalReq struct {
@@ -62,7 +61,7 @@ type MakePresignUrlInternalReq struct {
 }
 
 func (req MakePresignUrlInternalReq) String() string {
-	return fmt.Sprintf("[MakePresignUrlInternalReq={bucket=%s, key=%s}]", req.Bucket, req.Key)
+	return fmt.Sprintf("%#v", req)
 }
 
 type MakePresignUrlInternalResp struct {
@@ -70,7 +69,7 @@ type MakePresignUrlInternalResp struct {
 }
 
 func (resp MakePresignUrlInternalResp) String() string {
-	return fmt.Sprintf("[MakePresignUrlInternalResp={uri=%s}]", resp.Uri)
+	return fmt.Sprintf("%#v", resp)
 }
 
 type GetOwnPhotosResp struct {
@@ -79,7 +78,7 @@ type GetOwnPhotosResp struct {
 }
 
 func (resp GetOwnPhotosResp) String() string {
-	return fmt.Sprintf("[%v, GetOwnPhotosResp={photos=%v}]", resp.BaseResponse, resp.Photos)
+	return fmt.Sprintf("%#v", resp)
 }
 
 type OwnPhoto struct {
@@ -90,7 +89,7 @@ type OwnPhoto struct {
 }
 
 func (obj OwnPhoto) String() string {
-	return fmt.Sprintf("[OwnPhoto={photoId=%s, photoUri=%s, likes=%d, originPhotoId=%s}]", obj.PhotoId, obj.PhotoUri, obj.Likes, obj.OriginPhotoId)
+	return fmt.Sprintf("%#v", obj)
 }
 
 type DeletePhotoReq struct {
@@ -100,5 +99,5 @@ type DeletePhotoReq struct {
 }
 
 func (req DeletePhotoReq) String() string {
-	return fmt.Sprintf("[DeletePhotoReq={accessToken=%s, photoId=%s}]", req.AccessToken, req.PhotoId)
+	return fmt.Sprintf("%#v", req)
 }

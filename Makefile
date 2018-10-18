@@ -13,6 +13,8 @@ build:
 	GOOS=linux go build lambda-handle-task/internal_handle_task.go lambda-handle-task/remove_photo.go lambda-handle-task/resize_photo.go lambda-handle-task/remove_s3_object.go
 	@echo '--- Building warmup-image function ---'
 	GOOS=linux go build lambda-warmup/warm_up.go
+	@echo '--- Building lambda-handle-stream-image function ---'
+	GOOS=linux go build lambda-handle-stream/handle_stream.go lambda-handle-stream/like_photo.go
 
 stage-deploy-internal:
 	@echo '--- Build and deploy PresignFunction to STAGE ---'
@@ -35,6 +37,8 @@ zip_lambda: build
 	zip internal_handle_task.zip ./internal_handle_task
 	@echo '--- Zip warmup-image function ---'
 	zip warmup-image.zip ./warm_up
+	@echo '--- Zip lambda-handle-stream-image function ---'
+	zip handle_stream.zip ./handle_stream
 
 stage-deploy: stage-deploy-internal zip_lambda
 	@echo '--- Build lambda stage ---'
@@ -58,4 +62,6 @@ clean:
 	rm -rf internal_handle_task
 	rm -rf warmup-image.zip
 	rm -rf warm_up
+	rm -rf handle_stream
+	rm -rf handle_stream.zip
 

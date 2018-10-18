@@ -15,7 +15,7 @@ type AsyncTask struct {
 }
 
 func (task AsyncTask) String() string {
-	return fmt.Sprintf("[AsyncTask={taskType=%s}]", task.TaskType)
+	return fmt.Sprintf("%#v", task)
 }
 
 type RemovePhotoAsyncTask struct {
@@ -26,8 +26,7 @@ type RemovePhotoAsyncTask struct {
 }
 
 func (task RemovePhotoAsyncTask) String() string {
-	return fmt.Sprintf("[RemovePhotoAsyncTask={taskType=%s, userId=%s, photoId=%s, tableName=%s}]",
-		task.TaskType, task.UserId, task.PhotoId, task.TableName)
+	return fmt.Sprintf("%#v", task)
 }
 
 func NewRemovePhotoAsyncTask(userId, photoId, tableName string) *RemovePhotoAsyncTask {
@@ -46,7 +45,7 @@ type RemoveS3ObjectAsyncTask struct {
 }
 
 func (task RemoveS3ObjectAsyncTask) String() string {
-	return fmt.Sprintf("[RemoveS3ObjectAsyncTask={taskType=%s, bucket=%s, key=%s}]", task.TaskType, task.Bucket, task.Key)
+	return fmt.Sprintf("%#v", task)
 }
 
 func NewRemoveS3ObjectAsyncTask(bucket, key string) *RemoveS3ObjectAsyncTask {
@@ -72,10 +71,7 @@ type ResizePhotoAsyncTask struct {
 }
 
 func (task ResizePhotoAsyncTask) String() string {
-	return fmt.Sprintf("[ResizePhotoAsyncTask={taskType=%s, userId=%s, photoId=%s, photoType=%s, sourceBucket=%s, sourceKey=%s,"+
-		"targetWidth=%d, targetHeight=%d, targetBucket=%s, targetKey=%s, tableName=%s}]", task.TaskType,
-		task.UserId, task.PhotoId, task.PhotoType, task.SourceBucket, task.SourceKey, task.TargetWidth, task.TargetHeight,
-		task.TargetBucket, task.TargetKey, task.TableName)
+	return fmt.Sprintf("%#v", task)
 }
 
 func NewResizePhotoAsyncTask(userId, photoId, photoType, sourceBucket, sourceKey, targetBucket, targetKey, tableName string, targetWidth, targetHeight int) *ResizePhotoAsyncTask {
@@ -100,7 +96,7 @@ type CheckVerificationCompleteTask struct {
 }
 
 func (task CheckVerificationCompleteTask) String() string {
-	return fmt.Sprintf("[CheckVerificationCompleteTask={phone=%s, tableName=%s}]", task.Phone, task.TableName)
+	return fmt.Sprintf("%#v", task)
 }
 
 func NewCheckVerificationCompleteTask(phone, table string) *CheckVerificationCompleteTask {

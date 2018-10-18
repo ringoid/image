@@ -178,6 +178,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 			anlogger.Errorf(lc, "delete_photo.go : userId [%s], return %s to client", userId, errStr)
 			return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 		}
+		//todo: we need to delete original photo in some cases
 		task := apimodel.NewRemovePhotoAsyncTask(userId, val, userPhotoTable)
 		ok, errStr = apimodel.SendAsyncTask(task, asyncTaskQueue, userId, 0, awsSqsClient, anlogger, lc)
 		if !ok {

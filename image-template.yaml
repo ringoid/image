@@ -111,6 +111,9 @@ Globals:
             COMMON_STREAM:
               Fn::ImportValue:
                 !Join [ "-", [ !Ref Env, CommonEventStreamExportName] ]
+            INTERNAL_STREAM_NAME:
+              Fn::ImportValue:
+                !Join [ "-", [ !Ref Env, InternalEventStreamExportName] ]
             NEED_WARM_UP_LAMBDA_NAMES: !Join [ ",", [ !FindInMap [FunctionName, GetPreSignedUrlFunction, !Ref Env], !FindInMap [FunctionName, GetOwnPhotosFunction, !Ref Env], !FindInMap [FunctionName, DeletePhotoFunction, !Ref Env], !FindInMap [FunctionName, InternalPresignFunction, !Ref Env] ] ]
         Tags:
           Company: Ringoid
@@ -291,6 +294,25 @@ Resources:
                 - Arn
             BatchSize: 10
 
+  KinesisConsumerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Join [ "-", [ !Ref Env, internal-stream-consumer-image] ]
+      Handler: handle_stream
+      CodeUri: ./handle_stream.zip
+      Description: Consumer for Kinesis stream
+      Policies:
+        - AmazonKinesisFullAccess
+        - AmazonDynamoDBFullAccess
+      Events:
+        CommonEventStreamEvent:
+          Type: Kinesis
+          Properties:
+            Stream:
+              Fn::ImportValue:
+                !Join [ "-", [ !Ref Env, InternalEventStreamExport] ]
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 1
 
   PhotoUserMappingTable:
     Type: AWS::DynamoDB::Table

@@ -9,6 +9,7 @@ import (
 	"../sys_log"
 	"encoding/json"
 	"errors"
+	"strings"
 )
 
 func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *syslog.Logger) error {
@@ -23,18 +24,26 @@ func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *syslog.
 		return errors.New(errStr)
 	}
 
-	//delete only resized photo and keep origin photo
-	if userPhoto.PhotoType != "origin" {
-		ok, errStr = apimodel.DeleteFromS3(userPhoto.Bucket, userPhoto.Key, rTask.UserId, awsS3Client, lc, anlogger)
-		if !ok {
-			return errors.New(errStr)
-		}
+	//todo: we need to check if your was reported and don't delete origin photo
 
-		ok, errStr = deletePhotoFromDynamo(rTask.UserId, rTask.PhotoId, rTask.TableName, lc, anlogger)
+	ok, errStr = apimodel.DeleteFromS3(userPhoto.Bucket, userPhoto.Key, rTask.UserId, awsS3Client, lc, anlogger)
+	if !ok {
+		return errors.New(errStr)
+	}
+
+	ok, errStr = deletePhotoFromDynamo(rTask.UserId, rTask.PhotoId, rTask.TableName, lc, anlogger)
+	if !ok {
+		return errors.New(errStr)
+	}
+
+	//we need to delete meta info also
+	if strings.HasPrefix(rTask.PhotoId, "origin_") {
+		ok, errStr = deletePhotoFromDynamo(rTask.UserId+apimodel.PhotoPromaryKeyMetaPostfix, rTask.PhotoId, rTask.TableName, lc, anlogger)
 		if !ok {
 			return errors.New(errStr)
 		}
 	}
+
 	return nil
 }
 

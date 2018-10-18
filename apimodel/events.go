@@ -14,7 +14,7 @@ type UserAskUploadPhotoLinkEvent struct {
 }
 
 func (event UserAskUploadPhotoLinkEvent) String() string {
-	return fmt.Sprintf("[UserAskUploadPhotoLinkEvent={userId=%s, bucket=%s, photoKey=%s, unixTime=%v, eventType=%s}]", event.UserId, event.Bucket, event.PhotoKey, event.UnixTime, event.EventType)
+	return fmt.Sprintf("%#v", event)
 }
 
 func NewUserAskUploadLinkEvent(bucket, photoKey, userId string) *UserAskUploadPhotoLinkEvent {
@@ -39,7 +39,7 @@ type UserUploadedPhotoEvent struct {
 }
 
 func (event UserUploadedPhotoEvent) String() string {
-	return fmt.Sprintf("[UserUploadedPhotoEvent={userId=%s, bucket=%s, photoKey=%s, photoId=%s, photoType=%s, size=%v, unixTime=%v, eventType=%s}]", event.UserId, event.Bucket, event.PhotoKey, event.PhotoId, event.PhotoType, event.Size, event.UnixTime, event.EventType)
+	return fmt.Sprintf("%#v", event)
 }
 
 func NewUserUploadedPhotoEvent(photo UserPhoto) *UserUploadedPhotoEvent {
@@ -63,8 +63,7 @@ type UserDeletePhotoEvent struct {
 }
 
 func (event UserDeletePhotoEvent) String() string {
-	return fmt.Sprintf("[UserDeletePhotoEvent={userId=%s, photoId=%s, unixTime=%v, eventType=%s}]",
-		event.UserId, event.PhotoId, event.UnixTime, event.EventType)
+	return fmt.Sprintf("%#v", event)
 }
 
 func NewUserDeletePhotoEvent(userId, photoId string) *UserDeletePhotoEvent {
@@ -86,8 +85,7 @@ type RemoveTooLargeObjectEvent struct {
 }
 
 func (event RemoveTooLargeObjectEvent) String() string {
-	return fmt.Sprintf("[RemoveTooLargeObjectEvent={userId=%s, bucket=%s, key=%s, size=%v, unixTime=%v, eventType=%s}]",
-		event.UserId, event.Bucket, event.Key, event.Size, event.UnixTime, event.EventType)
+	return fmt.Sprintf("%#v", event)
 }
 
 func NewRemoveTooLargeObjectEvent(userId, bucket, key string, size int64) *RemoveTooLargeObjectEvent {
@@ -99,4 +97,27 @@ func NewRemoveTooLargeObjectEvent(userId, bucket, key string, size int64) *Remov
 		UnixTime:  time.Now().Unix(),
 		EventType: "IMAGE_REMOVE_TO_BIG_S3_OBJECT",
 	}
+}
+
+//Internal events in kinesis stream
+const (
+	LikePhotoInternalEvent = "INTERNAL_PHOTO_LIKE_EVENT"
+)
+
+type BaseInternalEvent struct {
+	EventType string `json:"eventType"`
+}
+
+func (event BaseInternalEvent) String() string {
+	return fmt.Sprintf("%#v", event)
+}
+
+type PhotoLikeInternalEvent struct {
+	EventType       string `json:"eventType"`
+	UserId          string `json:"userId"`
+	OriginalPhotoId string `json:"originPhotoId"`
+}
+
+func (event PhotoLikeInternalEvent) String() string {
+	return fmt.Sprintf("%#v", event)
 }

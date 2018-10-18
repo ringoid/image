@@ -16,6 +16,15 @@ type UserPhoto struct {
 }
 
 func (model UserPhoto) String() string {
-	return fmt.Sprintf("[UserPhoto={userId=%s, photoId=%s, photoSourceUri=%s, photoType=%s, bucket=%s, key=%s, size=%v, updatedAt=%s, likes=%d, originPhotoId=%s}]",
-		model.UserId, model.PhotoId, model.PhotoSourceUri, model.PhotoType, model.Bucket, model.Key, model.Size, model.UpdatedAt, model.Likes, model.OriginPhotoId)
+	return fmt.Sprintf("%#v", model)
+}
+
+type UserPhotoMetaInf struct {
+	UserId        string
+	OriginPhotoId string
+	Likes         int
+}
+
+func (model UserPhotoMetaInf) String() string {
+	return fmt.Sprintf("%#v", model)
 }

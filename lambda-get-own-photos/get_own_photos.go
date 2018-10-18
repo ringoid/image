@@ -17,7 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"sort"
 	"strings"
-	"math/rand"
+	"strconv"
 )
 
 var anlogger *syslog.Logger
@@ -156,9 +156,13 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	//call fake likes
-	makeFakeLikes(photos)
+	metaMap, ok, errStr := getMetaInfs(userId, lc)
+	if !ok {
+		anlogger.Errorf(lc, "get_own_photos.go : return %s to client", errStr)
+		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+	}
 
+	photos = fillMetaPhotoInf(photos, metaMap)
 	photos = sortOwnPhotos(photos)
 
 	resp := apimodel.GetOwnPhotosResp{}
@@ -183,21 +187,22 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	return events.APIGatewayProxyResponse{StatusCode: 200, Body: string(body)}, nil
 }
 
-func makeFakeLikes(source []*apimodel.UserPhoto) {
-	for index, val := range source {
-		if index != 0 {
-			val.Likes = rand.Intn(100)
+func fillMetaPhotoInf(source []*apimodel.UserPhoto, metaMap map[string]*apimodel.UserPhotoMetaInf) []*apimodel.UserPhoto {
+	for _, val := range source {
+		photoId := val.OriginPhotoId
+		if meta, ok := metaMap[photoId]; ok {
+			val.Likes = meta.Likes
 		}
 	}
+	return source
 }
 
 func sortOwnPhotos(source []*apimodel.UserPhoto) []*apimodel.UserPhoto {
 	sort.SliceStable(source, func(i, j int) bool {
-		return source[i].UpdatedAt > source[j].UpdatedAt
-		//if source[i].Likes == source[j].Likes {
-		//	return source[i].UpdatedAt > source[j].UpdatedAt
-		//}
-		//return source[i].Likes > source[j].Likes
+		if source[i].Likes == source[j].Likes {
+			return source[i].UpdatedAt > source[j].UpdatedAt
+		}
+		return source[i].Likes > source[j].Likes
 	})
 	return source
 }
@@ -251,6 +256,58 @@ func getOwnPhotos(userId, resolution string, lc *lambdacontext.LambdaContext) ([
 	}
 	anlogger.Debugf(lc, "get_own_photos.go : successfully fetch [%v] photos for userId [%s] and resolution [%s], result=%v",
 		*result.Count, userId, resolution, items)
+	return items, true, ""
+}
+
+//return photo's meta infs, ok and error string
+//todo:keep in mind that we should use ExclusiveStartKey later, if somebody will have > 100K photos
+func getMetaInfs(userId string, lc *lambdacontext.LambdaContext) (map[string]*apimodel.UserPhotoMetaInf, bool, string) {
+	anlogger.Debugf(lc, "get_own_photos.go : get all photo's meta infs for userId [%s]", userId)
+	metaInfPartitionKey := userId + apimodel.PhotoPromaryKeyMetaPostfix
+	input := &dynamodb.QueryInput{
+		ExpressionAttributeNames: map[string]*string{
+			"#userId": aws.String(apimodel.UserIdColumnName),
+		},
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":userIdV": {
+				S: aws.String(metaInfPartitionKey),
+			},
+		},
+		ConsistentRead:         aws.Bool(true),
+		KeyConditionExpression: aws.String("#userId = :userIdV"),
+		TableName:              aws.String(userPhotoTable),
+	}
+	result, err := awsDbClient.Query(input)
+	if err != nil {
+		anlogger.Errorf(lc, "get_own_photos.go : error while query all photo's meta infs for userId [%s] : %v", userId, err)
+		return make(map[string]*apimodel.UserPhotoMetaInf, 0), false, apimodel.InternalServerError
+	}
+
+	if *result.Count == 0 {
+		anlogger.Debugf(lc, "get_own_photos.go : there is no photo's meta info for userId [%s]", userId)
+		return make(map[string]*apimodel.UserPhotoMetaInf, 0), true, ""
+	}
+
+	items := make(map[string]*apimodel.UserPhotoMetaInf, 0)
+	for _, v := range result.Items {
+		photoId := *v[apimodel.PhotoIdColumnName].S
+
+		likes, err := strconv.Atoi(*v[apimodel.PhotoLikesColumnName].N)
+		if err != nil {
+			anlogger.Errorf(lc, "get_own_photos.go : error while convert likes from photo meta inf to int, photoId [%s] for userId [%s] : %v", photoId, userId, err)
+			return make(map[string]*apimodel.UserPhotoMetaInf, 0), false, apimodel.InternalServerError
+		}
+
+		items[photoId] = &apimodel.UserPhotoMetaInf{
+			UserId:        *v[apimodel.UserIdColumnName].S,
+			OriginPhotoId: photoId,
+			Likes:         likes,
+		}
+	}
+
+	anlogger.Debugf(lc, "get_own_photos.go : successfully fetch [%v] photo meta inf for userId [%s], result=%v",
+		*result.Count, userId, items)
+
 	return items, true, ""
 }
 
