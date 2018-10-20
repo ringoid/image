@@ -22,7 +22,7 @@ import (
 const defaultJPEGQuality = 80
 
 func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3manager.Uploader, awsDbClient *dynamodb.DynamoDB, lc *lambdacontext.LambdaContext, anlogger *syslog.Logger) error {
-	anlogger.Debugf(lc, "resize_photo.go : error resize photo by request body [%s]", body)
+	anlogger.Debugf(lc, "resize_photo.go : resize photo by request body [%s]", body)
 	var rTask apimodel.ResizePhotoAsyncTask
 	err := json.Unmarshal([]byte(body), &rTask)
 	if err != nil {

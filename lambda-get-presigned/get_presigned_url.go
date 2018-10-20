@@ -40,76 +40,72 @@ func init() {
 
 	env, ok = os.LookupEnv("ENV")
 	if !ok {
-		fmt.Printf("get_presigned_url.go : env can not be empty ENV")
+		fmt.Printf("lambda-initialization : get_presigned_url.go : env can not be empty ENV\n")
 		os.Exit(1)
 	}
-	fmt.Printf("get_presigned_url.go : start with ENV = [%s]", env)
+	fmt.Printf("lambda-initialization : get_presigned_url.go : start with ENV = [%s]\n", env)
 
 	papertrailAddress, ok = os.LookupEnv("PAPERTRAIL_LOG_ADDRESS")
 	if !ok {
-		fmt.Printf("get_presigned_url.go : env can not be empty PAPERTRAIL_LOG_ADDRESS")
+		fmt.Printf("lambda-initialization : get_presigned_url.go : env can not be empty PAPERTRAIL_LOG_ADDRESS\n")
 		os.Exit(1)
 	}
-	fmt.Printf("get_presigned_url.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]", papertrailAddress)
+	fmt.Printf("lambda-initialization : get_presigned_url.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]\n", papertrailAddress)
 
 	anlogger, err = syslog.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "get-presign-url-image"))
 	if err != nil {
-		fmt.Errorf("get_presigned_url.go : error during startup : %v", err)
+		fmt.Errorf("lambda-initialization : get_presigned_url.go : error during startup : %v\n", err)
 		os.Exit(1)
 	}
-	anlogger.Debugf(nil, "get_presigned_url.go : logger was successfully initialized")
+	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : logger was successfully initialized")
 
 	internalAuthFunctionName, ok = os.LookupEnv("INTERNAL_AUTH_FUNCTION_NAME")
 	if !ok {
-		fmt.Printf("get_presigned_url.go : env can not be empty INTERNAL_AUTH_FUNCTION_NAME")
-		os.Exit(1)
+		anlogger.Fatalf(nil, "lambda-initialization : get_presigned_url.go : env can not be empty INTERNAL_AUTH_FUNCTION_NAME")
 	}
-	anlogger.Debugf(nil, "get_presigned_url.go : start with INTERNAL_AUTH_FUNCTION_NAME = [%s]", internalAuthFunctionName)
+	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : start with INTERNAL_AUTH_FUNCTION_NAME = [%s]", internalAuthFunctionName)
 
 	presignFunctionName, ok = os.LookupEnv("PRESIGN_FUNCTION_NAME")
 	if !ok {
-		fmt.Printf("get_presigned_url.go : env can not be empty PRESIGN_FUNCTION_NAME")
-		os.Exit(1)
+		anlogger.Fatalf(nil, "lambda-initialization : get_presigned_url.go : env can not be empty PRESIGN_FUNCTION_NAME")
 	}
-	anlogger.Debugf(nil, "get_presigned_url.go : start with PRESIGN_FUNCTION_NAME = [%s]", presignFunctionName)
+	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : start with PRESIGN_FUNCTION_NAME = [%s]", presignFunctionName)
 
 	photoUserMappingTableName, ok = os.LookupEnv("PHOTO_USER_MAPPING_TABLE")
 	if !ok {
-		fmt.Printf("get_presigned_url.go : env can not be empty PHOTO_USER_MAPPING_TABLE")
-		os.Exit(1)
+		anlogger.Fatalf(nil,"lambda-initialization : get_presigned_url.go : env can not be empty PHOTO_USER_MAPPING_TABLE")
 	}
-	anlogger.Debugf(nil, "get_presigned_url.go : start with PHOTO_USER_MAPPING_TABLE = [%s]", photoUserMappingTableName)
+	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : start with PHOTO_USER_MAPPING_TABLE = [%s]", photoUserMappingTableName)
 
 	originPhotoBucketName, ok = os.LookupEnv("ORIGIN_PHOTO_BUCKET_NAME")
 	if !ok {
-		fmt.Printf("get_presigned_url.go : env can not be empty ORIGIN_PHOTO_BUCKET_NAME")
-		os.Exit(1)
+		anlogger.Fatalf(nil,"lambda-initialization : get_presigned_url.go : env can not be empty ORIGIN_PHOTO_BUCKET_NAME")
 	}
-	anlogger.Debugf(nil, "get_presigned_url.go : start with ORIGIN_PHOTO_BUCKET_NAME = [%s]", originPhotoBucketName)
+	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : start with ORIGIN_PHOTO_BUCKET_NAME = [%s]", originPhotoBucketName)
 
 	awsSession, err = session.NewSession(aws.NewConfig().
 		WithRegion(apimodel.Region).WithMaxRetries(apimodel.MaxRetries).
 		WithLogger(aws.LoggerFunc(func(args ...interface{}) { anlogger.AwsLog(args) })).WithLogLevel(aws.LogOff))
 	if err != nil {
-		anlogger.Fatalf(nil, "get_presigned_url.go : error during initialization : %v", err)
+		anlogger.Fatalf(nil, "lambda-initialization : get_presigned_url.go : error during initialization : %v", err)
 	}
-	anlogger.Debugf(nil, "get_presigned_url.go : aws session was successfully initialized")
+	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : aws session was successfully initialized")
 
 	awsDbClient = dynamodb.New(awsSession)
-	anlogger.Debugf(nil, "get_presigned_url.go : dynamodb client was successfully initialized")
+	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : dynamodb client was successfully initialized")
 
 	clientLambda = lambda.New(awsSession)
-	anlogger.Debugf(nil, "get_presigned_url.go : lambda client was successfully initialized")
+	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : lambda client was successfully initialized")
 
 	deliveryStreamName, ok = os.LookupEnv("DELIVERY_STREAM")
 	if !ok {
-		anlogger.Fatalf(nil, "get_presigned_url.go : env can not be empty DELIVERY_STREAM")
+		anlogger.Fatalf(nil, "lambda-initialization : get_presigned_url.go : env can not be empty DELIVERY_STREAM")
 		os.Exit(1)
 	}
-	anlogger.Debugf(nil, "get_presigned_url.go : start with DELIVERY_STREAM = [%s]", deliveryStreamName)
+	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : start with DELIVERY_STREAM = [%s]", deliveryStreamName)
 
 	awsDeliveryStreamClient = firehose.New(awsSession)
-	anlogger.Debugf(nil, "get_presigned_url.go : firehose client was successfully initialized")
+	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : firehose client was successfully initialized")
 }
 
 func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {

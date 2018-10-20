@@ -33,44 +33,44 @@ func init() {
 
 	env, ok = os.LookupEnv("ENV")
 	if !ok {
-		fmt.Printf("internal_handle_task.go : env can not be empty ENV")
+		fmt.Printf("lambda-initialization : internal_handle_task.go : env can not be empty ENV\n")
 		os.Exit(1)
 	}
-	fmt.Printf("internal_handle_task.go : start with ENV = [%s]", env)
+	fmt.Printf("lambda-initialization : internal_handle_task.go : start with ENV = [%s]\n", env)
 
 	papertrailAddress, ok = os.LookupEnv("PAPERTRAIL_LOG_ADDRESS")
 	if !ok {
-		fmt.Printf("internal_handle_task.go : env can not be empty PAPERTRAIL_LOG_ADDRESS")
+		fmt.Printf("lambda-initialization : internal_handle_task.go : env can not be empty PAPERTRAIL_LOG_ADDRESS\n")
 		os.Exit(1)
 	}
-	fmt.Printf("internal_handle_task.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]", papertrailAddress)
+	fmt.Printf("lambda-initialization : internal_handle_task.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]\n", papertrailAddress)
 
 	anlogger, err = syslog.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-handle-task-image"))
 	if err != nil {
-		fmt.Errorf("internal_handle_task.go : error during startup : %v", err)
+		fmt.Errorf("lambda-initialization : internal_handle_task.go : error during startup : %v\n", err)
 		os.Exit(1)
 	}
-	anlogger.Debugf(nil, "internal_handle_task.go : logger was successfully initialized")
+	anlogger.Debugf(nil, "lambda-initialization : internal_handle_task.go : logger was successfully initialized")
 
 	awsSession, err = session.NewSession(aws.NewConfig().
 		WithRegion(apimodel.Region).WithMaxRetries(apimodel.MaxRetries).
 		WithLogger(aws.LoggerFunc(func(args ...interface{}) { anlogger.AwsLog(args) })).WithLogLevel(aws.LogOff))
 	if err != nil {
-		anlogger.Fatalf(nil, "internal_handle_task.go : error during initialization : %v", err)
+		anlogger.Fatalf(nil, "lambda-initialization : internal_handle_task.go : error during initialization : %v", err)
 	}
-	anlogger.Debugf(nil, "internal_handle_task.go : aws session was successfully initialized")
+	anlogger.Debugf(nil, "lambda-initialization : internal_handle_task.go : aws session was successfully initialized")
 
 	awsDbClient = dynamodb.New(awsSession)
-	anlogger.Debugf(nil, "internal_handle_task.go : dynamodb client was successfully initialized")
+	anlogger.Debugf(nil, "lambda-initialization : internal_handle_task.go : dynamodb client was successfully initialized")
 
 	awsS3Client = s3.New(awsSession)
-	anlogger.Debugf(nil, "internal_handle_task.go : s3 client was successfully initialized")
+	anlogger.Debugf(nil, "lambda-initialization : internal_handle_task.go : s3 client was successfully initialized")
 
 	downloader = s3manager.NewDownloader(awsSession)
-	anlogger.Debugf(nil, "internal_handle_task.go : s3 downloader was successfully initialized")
+	anlogger.Debugf(nil, "lambda-initialization : internal_handle_task.go : s3 downloader was successfully initialized")
 
 	uploader = s3manager.NewUploader(awsSession)
-	anlogger.Debugf(nil, "internal_handle_task.go : s3 uploader was successfully initialized")
+	anlogger.Debugf(nil, "lambda-initialization : internal_handle_task.go : s3 uploader was successfully initialized")
 }
 
 func handler(ctx context.Context, event events.SQSEvent) (error) {

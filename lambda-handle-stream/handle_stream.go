@@ -29,42 +29,41 @@ func init() {
 
 	env, ok = os.LookupEnv("ENV")
 	if !ok {
-		fmt.Printf("handle_stream.go : env can not be empty ENV")
+		fmt.Printf("lambda-initialization : handle_stream.go : env can not be empty ENV\n")
 		os.Exit(1)
 	}
-	fmt.Printf("handle_stream.go : start with ENV = [%s]", env)
+	fmt.Printf("lambda-initialization : handle_stream.go : start with ENV = [%s]\n", env)
 
 	papertrailAddress, ok = os.LookupEnv("PAPERTRAIL_LOG_ADDRESS")
 	if !ok {
-		fmt.Printf("handle_stream.go : env can not be empty PAPERTRAIL_LOG_ADDRESS")
+		fmt.Printf("lambda-initialization : handle_stream.go : env can not be empty PAPERTRAIL_LOG_ADDRESS\n")
 		os.Exit(1)
 	}
-	fmt.Printf("handle_stream.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]", papertrailAddress)
+	fmt.Printf("lambda-initialization : handle_stream.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]\n", papertrailAddress)
 
 	anlogger, err = syslog.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-handle-stream-image"))
 	if err != nil {
-		fmt.Errorf("handle_stream.go : error during startup : %v", err)
+		fmt.Errorf("lambda-initialization : handle_stream.go : error during startup : %v\n", err)
 		os.Exit(1)
 	}
-	anlogger.Debugf(nil, "handle_stream.go : logger was successfully initialized")
+	anlogger.Debugf(nil, "lambda-initialization : handle_stream.go : logger was successfully initialized")
 
 	userPhotoTable, ok = os.LookupEnv("USER_PHOTO_TABLE")
 	if !ok {
-		fmt.Printf("handle_stream.go : env can not be empty USER_PHOTO_TABLE")
-		os.Exit(1)
+		anlogger.Fatalf(nil, "lambda-initialization : handle_stream.go : env can not be empty USER_PHOTO_TABLE")
 	}
-	anlogger.Debugf(nil, "handle_stream.go : start with USER_PHOTO_TABLE = [%s]", userPhotoTable)
+	anlogger.Debugf(nil, "lambda-initialization : handle_stream.go : start with USER_PHOTO_TABLE = [%s]", userPhotoTable)
 
 	awsSession, err = session.NewSession(aws.NewConfig().
 		WithRegion(apimodel.Region).WithMaxRetries(apimodel.MaxRetries).
 		WithLogger(aws.LoggerFunc(func(args ...interface{}) { anlogger.AwsLog(args) })).WithLogLevel(aws.LogOff))
 	if err != nil {
-		anlogger.Fatalf(nil, "handle_stream.go : error during initialization : %v", err)
+		anlogger.Fatalf(nil, "lambda-initialization : handle_stream.go : error during initialization : %v", err)
 	}
-	anlogger.Debugf(nil, "handle_stream.go : aws session was successfully initialized")
+	anlogger.Debugf(nil, "lambda-initialization : handle_stream.go : aws session was successfully initialized")
 
 	awsDbClient = dynamodb.New(awsSession)
-	anlogger.Debugf(nil, "handle_stream.go : dynamodb client was successfully initialized")
+	anlogger.Debugf(nil, "lambda-initialization : handle_stream.go : dynamodb client was successfully initialized")
 
 }
 
