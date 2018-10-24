@@ -73,13 +73,13 @@ func init() {
 
 	photoUserMappingTableName, ok = os.LookupEnv("PHOTO_USER_MAPPING_TABLE")
 	if !ok {
-		anlogger.Fatalf(nil,"lambda-initialization : get_presigned_url.go : env can not be empty PHOTO_USER_MAPPING_TABLE")
+		anlogger.Fatalf(nil, "lambda-initialization : get_presigned_url.go : env can not be empty PHOTO_USER_MAPPING_TABLE")
 	}
 	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : start with PHOTO_USER_MAPPING_TABLE = [%s]", photoUserMappingTableName)
 
 	originPhotoBucketName, ok = os.LookupEnv("ORIGIN_PHOTO_BUCKET_NAME")
 	if !ok {
-		anlogger.Fatalf(nil,"lambda-initialization : get_presigned_url.go : env can not be empty ORIGIN_PHOTO_BUCKET_NAME")
+		anlogger.Fatalf(nil, "lambda-initialization : get_presigned_url.go : env can not be empty ORIGIN_PHOTO_BUCKET_NAME")
 	}
 	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : start with ORIGIN_PHOTO_BUCKET_NAME = [%s]", originPhotoBucketName)
 
@@ -129,7 +129,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	userId, ok, errStr := apimodel.CallVerifyAccessToken(appVersion, isItAndroid, reqParam.AccessToken, internalAuthFunctionName, clientLambda, anlogger, lc)
+	userId, ok, _, errStr := apimodel.CallVerifyAccessToken(appVersion, isItAndroid, reqParam.AccessToken, internalAuthFunctionName, clientLambda, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "get_presigned_url.go : return %s to client", errStr)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
