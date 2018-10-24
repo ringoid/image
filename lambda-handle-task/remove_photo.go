@@ -38,7 +38,7 @@ func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *syslog.
 
 	//we need to delete meta info also
 	if strings.HasPrefix(rTask.PhotoId, "origin_") {
-		ok, errStr = deletePhotoFromDynamo(rTask.UserId+apimodel.PhotoPromaryKeyMetaPostfix, rTask.PhotoId, rTask.TableName, lc, anlogger)
+		ok, errStr = deletePhotoFromDynamo(rTask.UserId+apimodel.PhotoPrimaryKeyMetaPostfix, rTask.PhotoId, rTask.TableName, lc, anlogger)
 		if !ok {
 			return errors.New(errStr)
 		}

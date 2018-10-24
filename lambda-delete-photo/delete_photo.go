@@ -17,7 +17,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"time"
 	"strings"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/kinesis"
 )
@@ -99,7 +98,7 @@ func init() {
 
 	asyncTaskQueue, ok = os.LookupEnv("ASYNC_TASK_SQS_QUEUE")
 	if !ok {
-		anlogger.Fatalf(nil,"lambda-initialization : delete_photo.go : env can not be empty ASYNC_TASK_SQS_QUEUE")
+		anlogger.Fatalf(nil, "lambda-initialization : delete_photo.go : env can not be empty ASYNC_TASK_SQS_QUEUE")
 	}
 	anlogger.Debugf(nil, "lambda-initialization : delete_photo.go : start with ASYNC_TASK_SQS_QUEUE = [%s]", asyncTaskQueue)
 
@@ -240,19 +239,11 @@ func markAsDel(userId, photoId string, lc *lambdacontext.LambdaContext) (bool, s
 					S: aws.String(photoId),
 				},
 			},
-			TableName:           aws.String(userPhotoTable),
-			ConditionExpression: aws.String(fmt.Sprintf("attribute_exists(%s) AND attribute_exists(%s)", apimodel.UserIdColumnName, apimodel.PhotoIdColumnName)),
-			UpdateExpression:    aws.String("SET #deletedAt = :deletedAtV"),
+			TableName:        aws.String(userPhotoTable),
+			UpdateExpression: aws.String("SET #deletedAt = :deletedAtV"),
 		}
 	_, err := awsDbClient.UpdateItem(input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case dynamodb.ErrCodeConditionalCheckFailedException:
-				anlogger.Debugf(lc, "delete_photo.go : photoId [%s] not exist for userId [%s]", photoId, userId)
-				return true, ""
-			}
-		}
 		anlogger.Errorf(lc, "delete_photo.go : error while delete photoId [%s] for userId [%s] : %v", photoId, userId, err)
 		return false, apimodel.InternalServerError
 	}

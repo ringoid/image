@@ -262,7 +262,7 @@ func getOwnPhotos(userId, resolution string, lc *lambdacontext.LambdaContext) ([
 //todo:keep in mind that we should use ExclusiveStartKey later, if somebody will have > 100K photos
 func getMetaInfs(userId string, lc *lambdacontext.LambdaContext) (map[string]*apimodel.UserPhotoMetaInf, bool, string) {
 	anlogger.Debugf(lc, "get_own_photos.go : get all photo's meta infs for userId [%s]", userId)
-	metaInfPartitionKey := userId + apimodel.PhotoPromaryKeyMetaPostfix
+	metaInfPartitionKey := userId + apimodel.PhotoPrimaryKeyMetaPostfix
 	input := &dynamodb.QueryInput{
 		ExpressionAttributeNames: map[string]*string{
 			"#userId": aws.String(apimodel.UserIdColumnName),

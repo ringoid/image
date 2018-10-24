@@ -7,8 +7,6 @@ import (
 	"../apimodel"
 	"bytes"
 	"fmt"
-	"strconv"
-	"time"
 	"encoding/json"
 	"errors"
 	"github.com/aws/aws-sdk-go/aws"
@@ -52,10 +50,6 @@ func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3mana
 			rTask.SourceBucket, rTask.SourceKey, width, height, rTask.UserId, err)
 		return errors.New(apimodel.InternalServerError)
 	}
-	ok, errStr = uploadImage(result.Bytes(), rTask.TargetBucket, rTask.TargetKey, rTask.UserId, uploader, lc, anlogger)
-	if !ok {
-		return errors.New(errStr)
-	}
 	link := fmt.Sprintf("https://s3-eu-west-1.amazonaws.com/%s/%s", rTask.TargetBucket, rTask.TargetKey)
 	userPhoto := &apimodel.UserPhoto{
 		UserId:         rTask.UserId,
@@ -67,10 +61,19 @@ func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3mana
 		PhotoSourceUri: link,
 	}
 
-	ok, errStr = savePhoto(userPhoto, rTask.TableName, awsDbClient, lc, anlogger)
+	ok, errStr = apimodel.SavePhoto(userPhoto, rTask.TableName, awsDbClient, anlogger, lc)
+	//ok, errStr = savePhoto(userPhoto, rTask.TableName, awsDbClient, lc, anlogger)
+	if !ok && len(errStr) != 0 {
+		return errors.New(errStr)
+	} else if !ok && len(errStr) == 0 {
+		return nil
+	}
+
+	ok, errStr = uploadImage(result.Bytes(), rTask.TargetBucket, rTask.TargetKey, rTask.UserId, uploader, lc, anlogger)
 	if !ok {
 		return errors.New(errStr)
 	}
+
 	anlogger.Debugf(lc, "resize_photo.go : successfully resize photo by request %v for userId [%s]", rTask, rTask.UserId)
 	return nil
 }
@@ -107,62 +110,5 @@ func uploadImage(source []byte, bucket, key, userId string, uploader *s3manager.
 		return false, apimodel.InternalServerError
 	}
 	anlogger.Debugf(lc, "resize_photo.go : successfully uploaded image to bucket [%s] with a key [%s] for userId [%s]", bucket, key, userId)
-	return true, ""
-}
-
-func savePhoto(userPhoto *apimodel.UserPhoto, userPhotoTable string, awsDbClient *dynamodb.DynamoDB, lc *lambdacontext.LambdaContext, anlogger *syslog.Logger) (bool, string) {
-	anlogger.Debugf(lc, "resize_photo.go : save photo %v for userId [%s]", userPhoto, userPhoto.UserId)
-	input :=
-		&dynamodb.UpdateItemInput{
-			ExpressionAttributeNames: map[string]*string{
-				"#photoType":   aws.String(apimodel.PhotoTypeColumnName),
-				"#photoBucket": aws.String(apimodel.PhotoBucketColumnName),
-				"#photoKey":    aws.String(apimodel.PhotoKeyColumnName),
-				"#photoSize":   aws.String(apimodel.PhotoSizeColumnName),
-				"#updatedAt":   aws.String(apimodel.UpdatedTimeColumnName),
-			},
-			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-				":photoTypeV": {
-					S: aws.String(userPhoto.PhotoType),
-				},
-				":photoBucketV": {
-					S: aws.String(userPhoto.Bucket),
-				},
-				":photoKeyV": {
-					S: aws.String(userPhoto.Key),
-				},
-				":photoSizeV": {
-					N: aws.String(strconv.FormatInt(userPhoto.Size, 10)),
-				},
-				":updatedAtV": {
-					S: aws.String(time.Now().UTC().Format("2006-01-02-15-04-05.000")),
-				},
-			},
-			Key: map[string]*dynamodb.AttributeValue{
-				apimodel.UserIdColumnName: {
-					S: aws.String(userPhoto.UserId),
-				},
-				apimodel.PhotoIdColumnName: {
-					S: aws.String(userPhoto.PhotoId),
-				},
-			},
-			TableName:        aws.String(userPhotoTable),
-			UpdateExpression: aws.String("SET #photoType = :photoTypeV, #photoBucket = :photoBucketV, #photoKey = :photoKeyV, #photoSize = :photoSizeV, #updatedAt = :updatedAtV"),
-		}
-
-	if userPhoto.PhotoSourceUri != "" {
-		input.ExpressionAttributeNames["#photoUri"] = aws.String(apimodel.PhotoSourceUriColumnName)
-		input.ExpressionAttributeValues[":photoUriV"] = &dynamodb.AttributeValue{
-			S: aws.String(userPhoto.PhotoSourceUri),
-		}
-		input.UpdateExpression = aws.String("SET #photoUri = :photoUriV, #photoType = :photoTypeV, #photoBucket = :photoBucketV, #photoKey = :photoKeyV, #photoSize = :photoSizeV, #updatedAt = :updatedAtV")
-	}
-
-	_, err := awsDbClient.UpdateItem(input)
-	if err != nil {
-		anlogger.Errorf(lc, "resize_photo.go : error while save photo %v for userId [%s] : %v", userPhoto, userPhoto.UserId, err)
-		return false, apimodel.InternalServerError
-	}
-	anlogger.Debugf(lc, "resize_photo.go : successfully save photo %v for userId [%s]", userPhoto, userPhoto.UserId)
 	return true, ""
 }

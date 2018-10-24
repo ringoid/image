@@ -19,7 +19,7 @@ func likePhoto(body []byte, userPhotoTable string, awsDbClient *dynamodb.DynamoD
 		anlogger.Errorf(lc, "like_photo.go : error unmarshal body [%s] to ImageRemovePhotoTaskType: %v", string(body), err)
 		return errors.New(fmt.Sprintf("error unmarshal body %s : %v", string(body), err))
 	}
-	userPhotoMetaPartitionKey := aEvent.UserId + apimodel.PhotoPromaryKeyMetaPostfix
+	userPhotoMetaPartitionKey := aEvent.UserId + apimodel.PhotoPrimaryKeyMetaPostfix
 
 	input :=
 		&dynamodb.UpdateItemInput{

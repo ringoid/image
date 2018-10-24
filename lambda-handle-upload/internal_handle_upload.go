@@ -22,6 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/kinesis"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 )
 
 var anlogger *syslog.Logger
@@ -214,10 +215,19 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 			Size:      objectSize,
 		}
 
-		ok, errStr = savePhoto(&userPhoto, lc)
-		if !ok {
+		ok, errStr = apimodel.SavePhoto(&userPhoto, userPhotoTable, awsDbClient, anlogger, lc)
+		if !ok && len(errStr) != 0 {
 			return errors.New(errStr)
+		} else if !ok && len(errStr) == 0 {
+			anlogger.Warnf(lc, "internal_handle_upload.go : uploaded object was already deleted, bucket [%s], objectKey [%s], objectSize [%v] for userId [%s]",
+				objectBucket, objectKey, objectSize, userId)
+			task := apimodel.NewRemoveS3ObjectAsyncTask(objectBucket, objectKey)
+			ok, errStr = apimodel.SendAsyncTask(task, asyncTaskQueue, userId, 0, awsSqsClient, anlogger, lc)
+			if !ok {
+				return errors.New(errStr)
+			}
 		}
+
 		anlogger.Infof(lc, "internal_handle_upload.go : successfully save origin photo %v for userId [%s]", userPhoto, userPhoto.UserId)
 
 		event := apimodel.NewUserUploadedPhotoEvent(userPhoto)
@@ -314,8 +324,9 @@ func savePhoto(userPhoto *apimodel.UserPhoto, lc *lambdacontext.LambdaContext) (
 					S: aws.String(userPhoto.PhotoId),
 				},
 			},
-			TableName:        aws.String(userPhotoTable),
-			UpdateExpression: aws.String("SET #photoType = :photoTypeV, #photoBucket = :photoBucketV, #photoKey = :photoKeyV, #photoSize = :photoSizeV, #updatedAt = :updatedAtV"),
+			TableName:           aws.String(userPhotoTable),
+			ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%s)", apimodel.PhotoDeletedAtColumnName)),
+			UpdateExpression:    aws.String("SET #photoType = :photoTypeV, #photoBucket = :photoBucketV, #photoKey = :photoKeyV, #photoSize = :photoSizeV, #updatedAt = :updatedAtV"),
 		}
 
 	if userPhoto.PhotoSourceUri != "" {
@@ -328,9 +339,17 @@ func savePhoto(userPhoto *apimodel.UserPhoto, lc *lambdacontext.LambdaContext) (
 
 	_, err := awsDbClient.UpdateItem(input)
 	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case dynamodb.ErrCodeConditionalCheckFailedException:
+				anlogger.Debugf(lc, "internal_handle_upload.go : photo [%v] was already deleted for userId [%s]", userPhoto, userPhoto.UserId)
+				return false, ""
+			}
+		}
 		anlogger.Errorf(lc, "internal_handle_upload.go : error while save photo %v for userId [%s] : %v", userPhoto, userPhoto.UserId, err)
 		return false, apimodel.InternalServerError
 	}
+
 	anlogger.Debugf(lc, "internal_handle_upload.go : successfully save photo %v for userId [%s]", userPhoto, userPhoto.UserId)
 	return true, ""
 }
