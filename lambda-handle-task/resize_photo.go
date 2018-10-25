@@ -62,7 +62,6 @@ func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3mana
 	}
 
 	ok, errStr = apimodel.SavePhoto(userPhoto, rTask.TableName, awsDbClient, anlogger, lc)
-	//ok, errStr = savePhoto(userPhoto, rTask.TableName, awsDbClient, lc, anlogger)
 	if !ok && len(errStr) != 0 {
 		return errors.New(errStr)
 	} else if !ok && len(errStr) == 0 {

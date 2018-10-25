@@ -12,17 +12,14 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-lambda-go/events"
-	"time"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"errors"
 	"strings"
-	"strconv"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 )
 
 var anlogger *syslog.Logger
@@ -285,73 +282,6 @@ func getOwner(objectKey string, lc *lambdacontext.LambdaContext) (string, bool, 
 	userId := *result.Item[apimodel.UserIdColumnName].S
 	anlogger.Debugf(lc, "internal_handle_upload.go : found owner with userId [%s] for object key [%s]", userId, objectKey)
 	return userId, true, ""
-}
-
-//return ok and error string
-func savePhoto(userPhoto *apimodel.UserPhoto, lc *lambdacontext.LambdaContext) (bool, string) {
-	anlogger.Debugf(lc, "internal_handle_upload.go : save photo %v for userId [%s]", userPhoto, userPhoto.UserId)
-	input :=
-		&dynamodb.UpdateItemInput{
-			ExpressionAttributeNames: map[string]*string{
-				"#photoType":   aws.String(apimodel.PhotoTypeColumnName),
-				"#photoBucket": aws.String(apimodel.PhotoBucketColumnName),
-				"#photoKey":    aws.String(apimodel.PhotoKeyColumnName),
-				"#photoSize":   aws.String(apimodel.PhotoSizeColumnName),
-				"#updatedAt":   aws.String(apimodel.UpdatedTimeColumnName),
-			},
-			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-				":photoTypeV": {
-					S: aws.String(userPhoto.PhotoType),
-				},
-				":photoBucketV": {
-					S: aws.String(userPhoto.Bucket),
-				},
-				":photoKeyV": {
-					S: aws.String(userPhoto.Key),
-				},
-				":photoSizeV": {
-					N: aws.String(strconv.FormatInt(userPhoto.Size, 10)),
-				},
-				":updatedAtV": {
-					S: aws.String(time.Now().UTC().Format("2006-01-02-15-04-05.000")),
-				},
-			},
-			Key: map[string]*dynamodb.AttributeValue{
-				apimodel.UserIdColumnName: {
-					S: aws.String(userPhoto.UserId),
-				},
-				apimodel.PhotoIdColumnName: {
-					S: aws.String(userPhoto.PhotoId),
-				},
-			},
-			TableName:           aws.String(userPhotoTable),
-			ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%s)", apimodel.PhotoDeletedAtColumnName)),
-			UpdateExpression:    aws.String("SET #photoType = :photoTypeV, #photoBucket = :photoBucketV, #photoKey = :photoKeyV, #photoSize = :photoSizeV, #updatedAt = :updatedAtV"),
-		}
-
-	if userPhoto.PhotoSourceUri != "" {
-		input.ExpressionAttributeNames["#photoUri"] = aws.String(apimodel.PhotoSourceUriColumnName)
-		input.ExpressionAttributeValues[":photoUriV"] = &dynamodb.AttributeValue{
-			S: aws.String(userPhoto.PhotoSourceUri),
-		}
-		input.UpdateExpression = aws.String("SET #photoUri = :photoUriV, #photoType = :photoTypeV, #photoBucket = :photoBucketV, #photoKey = :photoKeyV, #photoSize = :photoSizeV, #updatedAt = :updatedAtV")
-	}
-
-	_, err := awsDbClient.UpdateItem(input)
-	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case dynamodb.ErrCodeConditionalCheckFailedException:
-				anlogger.Debugf(lc, "internal_handle_upload.go : photo [%v] was already deleted for userId [%s]", userPhoto, userPhoto.UserId)
-				return false, ""
-			}
-		}
-		anlogger.Errorf(lc, "internal_handle_upload.go : error while save photo %v for userId [%s] : %v", userPhoto, userPhoto.UserId, err)
-		return false, apimodel.InternalServerError
-	}
-
-	anlogger.Debugf(lc, "internal_handle_upload.go : successfully save photo %v for userId [%s]", userPhoto, userPhoto.UserId)
-	return true, ""
 }
 
 func main() {
