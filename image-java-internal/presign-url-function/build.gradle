@@ -31,6 +31,18 @@ shadowJar {
     version = null
 }
 
+task migratePresignFunctionToTest(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
+    functionName = "test-internal-presign-url-image"
+    role = "arn:aws:iam::${aws.accountId}:role/PresignFunctionRole"
+    zipFile = file("build/shadow/presign-function.jar")
+    handler = "com.ringoid.PresignFunction::handle"
+    runtime = "Java8"
+
+    functionDescription = "Presign url for uploading to s3"
+    memorySize = 512
+    timeout = 300
+}
+
 task migratePresignFunctionToStage(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
     functionName = "stage-internal-presign-url-image"
     role = "arn:aws:iam::${aws.accountId}:role/PresignFunctionRole"

@@ -166,7 +166,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	photoIds, originPhotoId := getAllPhotoIds(reqParam.PhotoId, userId, lc)
+	photoIds, originPhotoId := getAllPhotoIdsBasedOnSource(reqParam.PhotoId, userId, lc)
 	for _, val := range photoIds {
 		ok, errStr := markAsDel(userId, val, lc)
 		if !ok {
@@ -209,7 +209,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	return events.APIGatewayProxyResponse{StatusCode: 200, Body: string(body)}, nil
 }
 
-func getAllPhotoIds(sourceId, userId string, lc *lambdacontext.LambdaContext) ([]string, string) {
+func getAllPhotoIdsBasedOnSource(sourceId, userId string, lc *lambdacontext.LambdaContext) ([]string, string) {
 	anlogger.Debugf(lc, "delete_photo.go : make del photo id list based on photoId [%s] for userId [%s]", sourceId, userId)
 	arr := strings.Split(sourceId, "_")
 	baseId := arr[1]

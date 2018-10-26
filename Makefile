@@ -1,4 +1,6 @@
-all: clean stage-deploy
+stage-all: clean stage-deploy
+test-all: clean test-deploy
+prod-all: clean prod-deploy
 
 build:
 	@echo '--- Building getpresigned-image function ---'
@@ -15,6 +17,10 @@ build:
 	GOOS=linux go build lambda-warmup/warm_up.go
 	@echo '--- Building lambda-handle-stream-image function ---'
 	GOOS=linux go build lambda-handle-stream/handle_stream.go lambda-handle-stream/like_photo.go
+
+test-deploy-internal:
+	@echo '--- Build and deploy PresignFunction to TEST ---'
+	cd image-java-internal && gradle build :presign-url-function:migratePresignFunctionToTest
 
 stage-deploy-internal:
 	@echo '--- Build and deploy PresignFunction to STAGE ---'
@@ -40,12 +46,26 @@ zip_lambda: build
 	@echo '--- Zip lambda-handle-stream-image function ---'
 	zip handle_stream.zip ./handle_stream
 
+test-deploy: test-deploy-internal zip_lambda
+	@echo '--- Build lambda test ---'
+	@echo 'Package template'
+	sam package --template-file image-template.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
+	@echo 'Deploy test-image-stack'
+	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name test-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=test --no-fail-on-empty-changeset
+
 stage-deploy: stage-deploy-internal zip_lambda
 	@echo '--- Build lambda stage ---'
 	@echo 'Package template'
 	sam package --template-file image-template.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
 	@echo 'Deploy stage-image-stack'
 	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name stage-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=stage --no-fail-on-empty-changeset
+
+prod-deploy: prod-deploy-internal zip_lambda
+	@echo '--- Build lambda prod ---'
+	@echo 'Package template'
+	sam package --template-file image-template.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
+	@echo 'Deploy prod-image-stack'
+	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name prod-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=prod --no-fail-on-empty-changeset
 
 clean:
 	@echo '--- Delete old artifacts ---'

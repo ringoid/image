@@ -8,14 +8,23 @@ Mappings:
   LogMap:
     PapertrailLog:
       stage: "logs7.papertrailapp.com:23213"
-      prod: "should-be-prod-papertril-endpoint"
+      test: "logs7.papertrailapp.com:16637"
+      prod: "logs7.papertrailapp.com:16747"
 
   PresignedUrlName:
     FunctionName:
+      test: test-internal-presign-url-image
       stage: stage-internal-presign-url-image
       prod: prod-internal-presign-url-image
 
   UserPhotoTableCUMap:
+    test:
+      wcumax: 1
+      wcucrt: 1
+      wcumin: 1
+      rcumax: 1
+      rcucrt: 1
+      rcumin: 1
     stage:
       wcumax: 1
       wcucrt: 1
@@ -32,6 +41,13 @@ Mappings:
       rcumin: should-be-prod-value
 
   PhotoUserMappingTableCUMap:
+    test:
+      wcumax: 1
+      wcucrt: 1
+      wcumin: 1
+      rcumax: 1
+      rcucrt: 1
+      rcumin: 1
     stage:
       wcumax: 1
       wcucrt: 1
@@ -49,24 +65,31 @@ Mappings:
 
   FunctionName:
     GetPreSignedUrlFunction:
+      test: test-get-presigned-url-image
       stage: stage-get-presigned-url-image
       prod: prod-get-presigned-url-image
     InternalHandleUploadFunction:
+      test: test-internal-handle-upload-image
       stage: stage-internal-handle-upload-image
       prod: prod-internal-handle-upload-image
     GetOwnPhotosFunction:
+      test: test-get-own-photos-image
       stage: stage-get-own-photos-image
       prod: prod-get-own-photos-image
     DeletePhotoFunction:
+      test: test-delete-photo-image
       stage: stage-delete-photo-image
       prod: prod-delete-photo-image
     InternalHandleAsyncTaskFunction:
+      test: test-internal-handle-async-task-image
       stage: stage-internal-handle-async-task-image
       prod: prod-internal-handle-async-task-image
     WarmUpFunction:
+      test: test-warm-up-image
       stage: stage-warm-up-image
       prod: prod-warm-up-image
     InternalPresignFunction:
+      test: test-internal-presign-url-image
       stage: stage-internal-presign-url-image
       prod: prod-internal-presign-url-image
 
@@ -76,6 +99,7 @@ Parameters:
     Type: String
     Default: stage
     AllowedValues:
+      - test
       - stage
       - prod
     Description: Env name
@@ -178,7 +202,7 @@ Resources:
             Method: post
 
   OriginPhotoBucket:
-    Type: "AWS::S3::Bucket"
+    Type: AWS::S3::Bucket
     Properties:
       BucketName: !Join [ "-", [ !Ref Env, !Ref BaseOriginPhotoBucketName] ]
       NotificationConfiguration:
@@ -214,7 +238,7 @@ Resources:
           - Arn
 
   PublicPhotoBucket:
-    Type: "AWS::S3::Bucket"
+    Type: AWS::S3::Bucket
     Properties:
       AccessControl: PublicRead
       BucketName: !Join [ "-", [ !Ref Env, !Ref BasePublicPhotoBucketName] ]
