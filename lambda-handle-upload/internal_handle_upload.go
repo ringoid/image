@@ -223,6 +223,8 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 			if !ok {
 				return errors.New(errStr)
 			}
+			anlogger.Debugf(lc, "internal_handle_upload.go : successfully handle photo upload request %v", request)
+			return nil
 		}
 
 		anlogger.Infof(lc, "internal_handle_upload.go : successfully save origin photo %v for userId [%s]", userPhoto, userPhoto.UserId)

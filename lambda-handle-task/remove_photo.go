@@ -9,7 +9,6 @@ import (
 	"../sys_log"
 	"encoding/json"
 	"errors"
-	"strings"
 )
 
 func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *syslog.Logger) error {
@@ -31,18 +30,20 @@ func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *syslog.
 		return errors.New(errStr)
 	}
 
-	ok, errStr = deletePhotoFromDynamo(rTask.UserId, rTask.PhotoId, rTask.TableName, lc, anlogger)
-	if !ok {
-		return errors.New(errStr)
-	}
-
-	//we need to delete meta info also
-	if strings.HasPrefix(rTask.PhotoId, "origin_") {
-		ok, errStr = deletePhotoFromDynamo(rTask.UserId+apimodel.PhotoPrimaryKeyMetaPostfix, rTask.PhotoId, rTask.TableName, lc, anlogger)
-		if !ok {
-			return errors.New(errStr)
-		}
-	}
+	//There is no need to delete photo from DB, mark is enough
+	//so
+	//ok, errStr = deletePhotoFromDynamo(rTask.UserId, rTask.PhotoId, rTask.TableName, lc, anlogger)
+	//if !ok {
+	//	return errors.New(errStr)
+	//}
+	//
+	////we need to delete meta info also
+	//if strings.HasPrefix(rTask.PhotoId, "origin_") {
+	//	ok, errStr = deletePhotoFromDynamo(rTask.UserId+apimodel.PhotoPrimaryKeyMetaPostfix, rTask.PhotoId, rTask.TableName, lc, anlogger)
+	//	if !ok {
+	//		return errors.New(errStr)
+	//	}
+	//}
 
 	return nil
 }

@@ -187,6 +187,13 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		}
 	}
 
+	//Mark photo meta info like deleted also
+	ok, errStr = markAsDel(userId+apimodel.PhotoPrimaryKeyMetaPostfix, originPhotoId, lc)
+	if !ok {
+		anlogger.Errorf(lc, "delete_photo.go : userId [%s], return %s to client", userId, errStr)
+		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+	}
+
 	event := apimodel.NewUserDeletePhotoEvent(userId, originPhotoId)
 	apimodel.SendAnalyticEvent(event, userId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
 
