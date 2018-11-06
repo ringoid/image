@@ -102,3 +102,22 @@ type DeletePhotoReq struct {
 func (req DeletePhotoReq) String() string {
 	return fmt.Sprintf("%#v", req)
 }
+
+type Profile struct {
+	UserId string  `json:"userId"`
+	Photos []Photo `json:"photos"`
+}
+
+type Photo struct {
+	PhotoId  string `json:"photoId"`
+	PhotoUri string `json:"photoUri"`
+}
+
+type GetNewFacesResp struct {
+	BaseResponse
+	Profiles []Profile `json:"profiles"`
+}
+
+func (resp GetNewFacesResp) String() string {
+	return fmt.Sprintf("%#v", resp)
+}
