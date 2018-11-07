@@ -17,6 +17,8 @@ build:
 	GOOS=linux go build lambda-warmup/warm_up.go
 	@echo '--- Building lambda-handle-stream-image function ---'
 	GOOS=linux go build lambda-handle-stream/handle_stream.go lambda-handle-stream/like_photo.go
+	@echo '--- Building internal-get-images-image function ---'
+	GOOS=linux go build lambda-internal-getimages/get_images.go
 
 test-deploy-internal:
 	@echo '--- Build and deploy PresignFunction to TEST ---'
@@ -45,6 +47,8 @@ zip_lambda: build
 	zip warmup-image.zip ./warm_up
 	@echo '--- Zip lambda-handle-stream-image function ---'
 	zip handle_stream.zip ./handle_stream
+	@echo '--- Zip internal-get-images-image function ---'
+	zip get_images.zip ./get_images
 
 test-deploy: test-deploy-internal zip_lambda
 	@echo '--- Build lambda test ---'
@@ -84,4 +88,6 @@ clean:
 	rm -rf warm_up
 	rm -rf handle_stream
 	rm -rf handle_stream.zip
+	rm -rf get_images.zip
+	rm -rf get_images
 

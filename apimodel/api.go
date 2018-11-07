@@ -25,7 +25,7 @@ func (req InternalGetUserIdReq) String() string {
 
 type InternalGetUserIdResp struct {
 	BaseResponse
-	UserId string `json:"userId"`
+	UserId         string `json:"userId"`
 	IsUserReported bool   `json:"isUserReported"`
 }
 
@@ -115,9 +115,20 @@ type Photo struct {
 
 type GetNewFacesResp struct {
 	BaseResponse
-	Profiles []Profile `json:"profiles"`
+	WarmUpRequest bool      `json:"warmUpRequest"`
+	Profiles      []Profile `json:"profiles"`
 }
 
 func (resp GetNewFacesResp) String() string {
+	return fmt.Sprintf("%#v", resp)
+}
+
+type FacesWithUrlResp struct {
+	BaseResponse
+	//contains userId_photoId like a key and photoUrl like a value
+	UserIdPhotoIdKeyUrlMap map[string]string `json:"urlPhotoMap"`
+}
+
+func (resp FacesWithUrlResp) String() string {
 	return fmt.Sprintf("%#v", resp)
 }

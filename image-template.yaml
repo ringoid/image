@@ -11,12 +11,6 @@ Mappings:
       test: "logs7.papertrailapp.com:16637"
       prod: "logs7.papertrailapp.com:16747"
 
-  PresignedUrlName:
-    FunctionName:
-      test: test-internal-presign-url-image
-      stage: stage-internal-presign-url-image
-      prod: prod-internal-presign-url-image
-
   UserPhotoTableCUMap:
     test:
       wcumax: 1
@@ -92,7 +86,10 @@ Mappings:
       test: test-internal-presign-url-image
       stage: stage-internal-presign-url-image
       prod: prod-internal-presign-url-image
-
+    InternalGetImagesFunction:
+      test: test-internal-get-images-image
+      stage: stage-internal-get-images-image
+      prod: prod--internal-get-images-image
 
 Parameters:
   Env:
@@ -126,7 +123,7 @@ Globals:
             INTERNAL_AUTH_FUNCTION_NAME:
               Fn::ImportValue:
                 !Join [ "-", [ !Ref Env, InternalGetUserIdFunctionExport] ]
-            PRESIGN_FUNCTION_NAME: !FindInMap [PresignedUrlName, FunctionName, !Ref Env]
+            PRESIGN_FUNCTION_NAME: !FindInMap [FunctionName, InternalPresignFunction, !Ref Env]
             ORIGIN_PHOTO_BUCKET_NAME: !Join [ "-", [ !Ref Env, !Ref BaseOriginPhotoBucketName] ]
             PHOTO_USER_MAPPING_TABLE: !Ref PhotoUserMappingTable
             USER_PHOTO_TABLE: !Ref UserPhotoTable
@@ -138,7 +135,7 @@ Globals:
             INTERNAL_STREAM_NAME:
               Fn::ImportValue:
                 !Join [ "-", [ !Ref Env, InternalEventStreamExportName] ]
-            NEED_WARM_UP_LAMBDA_NAMES: !Join [ ",", [ !FindInMap [FunctionName, GetPreSignedUrlFunction, !Ref Env], !FindInMap [FunctionName, GetOwnPhotosFunction, !Ref Env], !FindInMap [FunctionName, DeletePhotoFunction, !Ref Env], !FindInMap [FunctionName, InternalPresignFunction, !Ref Env] ] ]
+            NEED_WARM_UP_LAMBDA_NAMES: !Join [ ",", [ !FindInMap [FunctionName, GetPreSignedUrlFunction, !Ref Env], !FindInMap [FunctionName, GetOwnPhotosFunction, !Ref Env], !FindInMap [FunctionName, DeletePhotoFunction, !Ref Env], !FindInMap [FunctionName, InternalPresignFunction, !Ref Env], !FindInMap [FunctionName, InternalGetImagesFunction, !Ref Env]  ] ]
         Tags:
           Company: Ringoid
           Service: image
@@ -337,6 +334,16 @@ Resources:
                 !Join [ "-", [ !Ref Env, InternalEventStreamExport] ]
             StartingPosition: TRIM_HORIZON
             BatchSize: 1
+
+  InternalGetImagesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !FindInMap [FunctionName, InternalGetImagesFunction, !Ref Env]
+      Handler: get_images
+      CodeUri: ./get_images.zip
+      Description: Internal Get Images function
+      Policies:
+        - AmazonDynamoDBFullAccess
 
   PhotoUserMappingTable:
     Type: AWS::DynamoDB::Table
@@ -551,3 +558,9 @@ Resources:
                   - "cloudwatch:SetAlarmState"
                   - "cloudwatch:DeleteAlarms"
                 Resource: "*"
+
+Outputs:
+  InternalGetImagesFunctionExport:
+    Value: !FindInMap [FunctionName, InternalGetImagesFunction, !Ref Env]
+    Export:
+      Name: !Join [ "-", [ !Ref Env, InternalGetImagesFunctionExport] ]

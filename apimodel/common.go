@@ -40,6 +40,7 @@ const (
 	PhotoKeyColumnName       = "photo_key"
 	PhotoSizeColumnName      = "photo_size"
 	PhotoDeletedAtColumnName = "deleted_at"
+	PhotoHiddenAtColumnName  = "hidden_at"
 	PhotoLikesColumnName     = "likes"
 
 	PhotoPrimaryKeyMetaPostfix = "_meta"
