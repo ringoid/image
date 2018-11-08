@@ -184,7 +184,7 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 
 		//todo: uncomment before prod
 		//if objectSize >= defaultMaxPhotoSize {
-		//	anlogger.Warnf(lc, "internal_handle_upload.go : uploaded object to big, bucket [%s], objectKey [%s], objectSize [%v] for userId [%s]",
+		//	anlogger.Warnf(lc, "internal_handle_upload.go : uploaded object too big, bucket [%s], objectKey [%s], objectSize [%v] for userId [%s]",
 		//		objectBucket, objectKey, objectSize, userId)
 		//	task := apimodel.NewRemoveS3ObjectAsyncTask(objectBucket, objectKey)
 		//	ok, errStr = apimodel.SendAsyncTask(task, asyncTaskQueue, userId, awsSqsClient, anlogger, lc)

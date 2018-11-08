@@ -280,7 +280,7 @@ func GetOriginPhotoId(userId, sourcePhotoId string, anlogger *syslog.Logger, lc 
 	}
 	arr := strings.Split(sourcePhotoId, "_")
 	if len(arr) != 2 {
-		anlogger.Warnf(lc, "common_action.go : wrong source photo id for userId [%s]", userId)
+		anlogger.Warnf(lc, "common_action.go : wrong source photo id [%s] for userId [%s]", sourcePhotoId, userId)
 		return "", false
 	}
 	baseId := arr[1]
@@ -288,6 +288,24 @@ func GetOriginPhotoId(userId, sourcePhotoId string, anlogger *syslog.Logger, lc 
 	anlogger.Debugf(lc, "common_action.go : successfully get origin photo id [%s] for source photo id [%s] for userId [%s]",
 		originPhotoId, sourcePhotoId, userId)
 	return originPhotoId, true
+}
+
+func GetResolutionPhotoId(userId, originPhotoId, resolution string, anlogger *syslog.Logger, lc *lambdacontext.LambdaContext) (string, bool) {
+	anlogger.Debugf(lc, "common_action.go : get resolution [%s] photo id based on origin photo id [%s] for userId [%s]", resolution, originPhotoId, userId)
+	if len(originPhotoId) == 0 {
+		anlogger.Warnf(lc, "common_action.go : empty origin photo id for userId [%s]", userId)
+		return "", false
+	}
+	arr := strings.Split(originPhotoId, "_")
+	if len(arr) != 2 {
+		anlogger.Warnf(lc, "common_action.go : wrong origin photo id [%s] for userId [%s]", originPhotoId, userId)
+		return "", false
+	}
+	baseId := arr[1]
+	resolutionPhotoId := resolution + "_" + baseId
+	anlogger.Debugf(lc, "common_action.go : successfully get resolution [%s] photo id [%s] for origin photo id [%s] for userId [%s]",
+		resolution, resolutionPhotoId, originPhotoId, userId)
+	return resolutionPhotoId, true
 }
 
 //return ok and error string

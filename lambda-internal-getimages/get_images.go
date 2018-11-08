@@ -17,8 +17,7 @@ var anlogger *syslog.Logger
 var awsDbClient *dynamodb.DynamoDB
 var userPhotoTable string
 
-//todo:change after testing to 100
-const defaultBatchSize = 2 //100 is a max
+const defaultBatchSize = 100 //100 is a max
 
 func init() {
 	var env string
@@ -41,7 +40,7 @@ func init() {
 	}
 	fmt.Printf("lambda-initialization : get_images.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]\n", papertrailAddress)
 
-	anlogger, err = syslog.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "get-own-photos-image"))
+	anlogger, err = syslog.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-get-images-image"))
 	if err != nil {
 		fmt.Errorf("lambda-initialization : get_images.go : error during startup : %v\n", err)
 		os.Exit(1)
@@ -71,7 +70,7 @@ func init() {
 func handler(ctx context.Context, request apimodel.GetNewFacesResp) (apimodel.FacesWithUrlResp, error) {
 	lc, _ := lambdacontext.FromContext(ctx)
 
-	anlogger.Debugf(lc, "get_images.go : start handle request %v", request)
+	anlogger.Debugf(lc, "get_images.go : start handle request, isItWarmUpRequest [%v],  profiles %v", request.WarmUpRequest, request.Profiles)
 
 	if request.WarmUpRequest {
 		return apimodel.FacesWithUrlResp{}, nil
@@ -99,8 +98,6 @@ func handler(ctx context.Context, request apimodel.GetNewFacesResp) (apimodel.Fa
 		batchCounter++
 	}
 
-	anlogger.Debugf(lc, "get_images.go : run [%d] batch requests")
-
 	finalMap := make(map[string]string)
 	for i := 0; i < batchCounter; i++ {
 		resMap := <-respChan
@@ -113,14 +110,14 @@ func handler(ctx context.Context, request apimodel.GetNewFacesResp) (apimodel.Fa
 		UserIdPhotoIdKeyUrlMap: finalMap,
 	}
 
-	anlogger.Debugf(lc, "get_images.go : return successful resp [%s]", respChan)
+	anlogger.Debugf(lc, "get_images.go : return successful resp %v", resp)
 	return resp, nil
 }
 
 //as an argument function receives list with maps where each key is userId and value is photoId
 //return map where each key is userId_photoId and value is photo url, ok and error string
 func photos(userIdPhotos []map[string]string, respChan chan<- map[string]string, lc *lambdacontext.LambdaContext) {
-	anlogger.Debugf(lc, "get_images.go : make batch request to fetch photos, userIdPhotos %v", userIdPhotos)
+	anlogger.Debugf(lc, "get_images.go : make batch request to fetch photos, len is %d", len(userIdPhotos))
 	keys := make([]map[string]*dynamodb.AttributeValue, 0)
 	for _, paramMap := range userIdPhotos {
 		eachMap := make(map[string]*dynamodb.AttributeValue)
@@ -165,12 +162,12 @@ func photos(userIdPhotos []map[string]string, respChan chan<- map[string]string,
 			_, wasPhotoDeleted := eachAttr[apimodel.PhotoDeletedAtColumnName]
 			_, wasHidden := eachAttr[apimodel.PhotoHiddenAtColumnName]
 			if wasPhotoDeleted || wasHidden {
-				anlogger.Debugf(lc, "get_images.go : photo with userId [%s] and photoId [%s] is deleted or hidden, so exclude it from response")
+				anlogger.Debugf(lc, "get_images.go : photo with userId [%s] and photoId [%s] is deleted or hidden, so exclude it from response", targetUserId, targetPhotoId)
 				continue
 			}
 			targetPhotoUriAttr, ok := eachAttr[apimodel.PhotoSourceUriColumnName]
 			if !ok {
-				anlogger.Debugf(lc, "get_images.go : photo with userId [%s] and photoId [%s] don't have uri, so exclude it from response")
+				anlogger.Debugf(lc, "get_images.go : photo with userId [%s] and photoId [%s] don't have uri, so exclude it from response", targetUserId, targetPhotoId)
 				continue
 			}
 			resultMap[targetUserId+"_"+targetPhotoId] = *targetPhotoUriAttr.S

@@ -272,6 +272,7 @@ func getMetaInfs(userId string, lc *lambdacontext.LambdaContext) (map[string]*ap
 				S: aws.String(metaInfPartitionKey),
 			},
 		},
+		FilterExpression:       aws.String(fmt.Sprintf("attribute_not_exists(%s)", apimodel.PhotoDeletedAtColumnName)),
 		ConsistentRead:         aws.Bool(true),
 		KeyConditionExpression: aws.String("#userId = :userIdV"),
 		TableName:              aws.String(userPhotoTable),
@@ -286,6 +287,8 @@ func getMetaInfs(userId string, lc *lambdacontext.LambdaContext) (map[string]*ap
 		anlogger.Debugf(lc, "get_own_photos.go : there is no photo's meta info for userId [%s]", userId)
 		return make(map[string]*apimodel.UserPhotoMetaInf, 0), true, ""
 	}
+
+	anlogger.Debugf(lc, "get_own_photos.go : there is [%d] photo's meta info for userId [%s]", *result.Count, userId)
 
 	items := make(map[string]*apimodel.UserPhotoMetaInf, 0)
 	for _, v := range result.Items {
