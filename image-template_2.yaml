@@ -89,7 +89,12 @@ Mappings:
     InternalGetImagesFunction:
       test: test-internal-get-images-image
       stage: stage-internal-get-images-image
-      prod: prod--internal-get-images-image
+      prod: prod-internal-get-images-image
+    InternalCleanDbImageFunction:
+      test: test-internal-clean-db-image
+      stage: stage-internal-clean-db-image
+      prod: prod-internal-clean-db-image
+
 
 Parameters:
   Env:
@@ -153,6 +158,17 @@ Resources:
       Policies:
         - AWSLambdaFullAccess
 
+  InternalCleanDbImageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !FindInMap [FunctionName, InternalCleanDbImageFunction, !Ref Env]
+      Handler: clean
+      CodeUri: ./clean.zip
+      Description: Clean DB image function
+      Policies:
+        - AWSLambdaFullAccess
+        - AmazonDynamoDBFullAccess
+
   ScheduledWarmUpFunctionRule:
     Type: AWS::Events::Rule
     Properties:
@@ -202,11 +218,6 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Join [ "-", [ !Ref Env, !Ref BaseOriginPhotoBucketName] ]
-      NotificationConfiguration:
-        LambdaConfigurations:
-          -
-            Function: !GetAtt InternalHandleUploadFunction.Arn
-            Event: "s3:ObjectCreated:*"
 
   InternalHandleUploadFunction:
     Type: AWS::Serverless::Function
@@ -564,3 +575,7 @@ Outputs:
     Value: !FindInMap [FunctionName, InternalGetImagesFunction, !Ref Env]
     Export:
       Name: !Join [ "-", [ !Ref Env, InternalGetImagesFunctionExport] ]
+  InternalCleanDbImageFunctionExport:
+    Value: !FindInMap [FunctionName, InternalCleanDbImageFunction, !Ref Env]
+    Export:
+      Name: !Join [ "-", [ !Ref Env, InternalCleanDbImageFunctionExport] ]

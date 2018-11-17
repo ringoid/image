@@ -19,6 +19,8 @@ build:
 	GOOS=linux go build lambda-handle-stream/handle_stream.go lambda-handle-stream/like_photo.go
 	@echo '--- Building internal-get-images-image function ---'
 	GOOS=linux go build lambda-internal-getimages/get_images.go
+	@echo '--- Building internal-clean-db-image function ---'
+	GOOS=linux go build lambda-clean-db/clean.go
 
 test-deploy-internal:
 	@echo '--- Build and deploy PresignFunction to TEST ---'
@@ -49,26 +51,52 @@ zip_lambda: build
 	zip handle_stream.zip ./handle_stream
 	@echo '--- Zip internal-get-images-image function ---'
 	zip get_images.zip ./get_images
+	@echo '--- Zip internal-clean-db-image function ---'
+	zip clean.zip ./clean
 
 test-deploy: test-deploy-internal zip_lambda
 	@echo '--- Build lambda test ---'
-	@echo 'Package template'
-	sam package --template-file image-template.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
-	@echo 'Deploy test-image-stack'
+	@echo 'Package template 1 phase'
+	sam package --template-file image-template_1.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
+	@echo 'Deploy test-image-stack 1 phase'
+	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name test-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=test --no-fail-on-empty-changeset
+	@echo 'Package template 2 phase'
+	sam package --template-file image-template_2.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
+	@echo 'Deploy test-image-stack 2 phase'
+	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name test-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=test --no-fail-on-empty-changeset
+	@echo 'Package template 3 phase'
+	sam package --template-file image-template_3.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
+	@echo 'Deploy test-image-stack 3 phase'
 	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name test-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=test --no-fail-on-empty-changeset
 
 stage-deploy: stage-deploy-internal zip_lambda
 	@echo '--- Build lambda stage ---'
-	@echo 'Package template'
-	sam package --template-file image-template.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
-	@echo 'Deploy stage-image-stack'
+	@echo 'Package template 1 phase'
+	sam package --template-file image-template_1.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
+	@echo 'Deploy stage-image-stack 1 phase'
+	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name stage-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=stage --no-fail-on-empty-changeset
+	@echo 'Package template 2 phase'
+	sam package --template-file image-template_2.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
+	@echo 'Deploy stage-image-stack 2 phase'
+	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name stage-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=stage --no-fail-on-empty-changeset
+	@echo 'Package template 3 phase'
+	sam package --template-file image-template_3.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
+	@echo 'Deploy stage-image-stack 3 phase'
 	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name stage-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=stage --no-fail-on-empty-changeset
 
 prod-deploy: prod-deploy-internal zip_lambda
 	@echo '--- Build lambda prod ---'
-	@echo 'Package template'
-	sam package --template-file image-template.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
-	@echo 'Deploy prod-image-stack'
+	@echo 'Package template 1 phase'
+	sam package --template-file image-template_1.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
+	@echo 'Deploy prod-image-stack 1 phase'
+	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name prod-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=prod --no-fail-on-empty-changeset
+	@echo 'Package template 2 phase'
+	sam package --template-file image-template_2.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
+	@echo 'Deploy prod-image-stack 2 phase'
+	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name prod-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=prod --no-fail-on-empty-changeset
+	@echo 'Package template 3 phase'
+	sam package --template-file image-template_3.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
+	@echo 'Deploy prod-image-stack 3 phase'
 	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name prod-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=prod --no-fail-on-empty-changeset
 
 clean:
@@ -90,4 +118,6 @@ clean:
 	rm -rf handle_stream.zip
 	rm -rf get_images.zip
 	rm -rf get_images
+	rm -rf clean.zip
+	rm -rf clean
 
