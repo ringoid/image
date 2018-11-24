@@ -3,6 +3,7 @@ test-all: clean test-deploy
 prod-all: clean prod-deploy
 
 build:
+	go get -u github.com/ringoid/commons
 	@echo '--- Building getpresigned-image function ---'
 	GOOS=linux go build lambda-get-presigned/get_presigned_url.go
 	@echo '--- Building internal-handle-upload-image function ---'

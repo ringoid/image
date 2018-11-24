@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	basicLambda "github.com/aws/aws-lambda-go/lambda"
-	"../sys_log"
 	"../apimodel"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/aws"
@@ -19,9 +18,10 @@ import (
 	"strings"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/kinesis"
+	"github.com/ringoid/commons"
 )
 
-var anlogger *syslog.Logger
+var anlogger *commons.Logger
 var awsDbClient *dynamodb.DynamoDB
 var awsDeliveryStreamClient *firehose.Firehose
 var deliveryStreamName string
@@ -57,7 +57,7 @@ func init() {
 	}
 	fmt.Printf("lambda-initialization : delete_photo.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]\n", papertrailAddress)
 
-	anlogger, err = syslog.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "delete-photo-image"))
+	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "delete-photo-image"))
 	if err != nil {
 		fmt.Errorf("lambda-initialization : delete_photo.go : error during startup : %v\n", err)
 	}
@@ -103,7 +103,7 @@ func init() {
 	anlogger.Debugf(nil, "lambda-initialization : delete_photo.go : start with ASYNC_TASK_SQS_QUEUE = [%s]", asyncTaskQueue)
 
 	awsSession, err = session.NewSession(aws.NewConfig().
-		WithRegion(apimodel.Region).WithMaxRetries(apimodel.MaxRetries).
+		WithRegion(commons.Region).WithMaxRetries(commons.MaxRetries).
 		WithLogger(aws.LoggerFunc(func(args ...interface{}) { anlogger.AwsLog(args) })).WithLogLevel(aws.LogOff))
 	if err != nil {
 		anlogger.Fatalf(nil, "lambda-initialization : delete_photo.go : error during initialization : %v", err)
@@ -144,11 +144,11 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 
 	anlogger.Debugf(lc, "delete_photo.go : start handle request %v", request)
 
-	if apimodel.IsItWarmUpRequest(request.Body, anlogger, lc) {
+	if commons.IsItWarmUpRequest(request.Body, anlogger, lc) {
 		return events.APIGatewayProxyResponse{}, nil
 	}
 
-	appVersion, isItAndroid, ok, errStr := apimodel.ParseAppVersionFromHeaders(request.Headers, anlogger, lc)
+	appVersion, isItAndroid, ok, errStr := commons.ParseAppVersionFromHeaders(request.Headers, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "delete_photo.go : return %s to client", errStr)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
@@ -160,7 +160,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	userId, ok, wasReported, errStr := apimodel.CallVerifyAccessToken(appVersion, isItAndroid, reqParam.AccessToken, internalAuthFunctionName, clientLambda, anlogger, lc)
+	userId, ok, wasReported, errStr := commons.CallVerifyAccessToken(appVersion, isItAndroid, reqParam.AccessToken, internalAuthFunctionName, clientLambda, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "delete_photo.go : return %s to client", errStr)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
@@ -180,7 +180,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		}
 
 		task := apimodel.NewRemovePhotoAsyncTask(userId, val, userPhotoTable)
-		ok, errStr = apimodel.SendAsyncTask(task, asyncTaskQueue, userId, 0, awsSqsClient, anlogger, lc)
+		ok, errStr = commons.SendAsyncTask(task, asyncTaskQueue, userId, 0, awsSqsClient, anlogger, lc)
 		if !ok {
 			anlogger.Errorf(lc, "delete_photo.go : userId [%s], return %s to client", userId, errStr)
 			return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
@@ -188,28 +188,28 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	}
 
 	//Mark photo meta info like deleted also
-	ok, errStr = markAsDel(userId+apimodel.PhotoPrimaryKeyMetaPostfix, originPhotoId, lc)
+	ok, errStr = markAsDel(userId+commons.PhotoPrimaryKeyMetaPostfix, originPhotoId, lc)
 	if !ok {
 		anlogger.Errorf(lc, "delete_photo.go : userId [%s], return %s to client", userId, errStr)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	event := apimodel.NewUserDeletePhotoEvent(userId, originPhotoId)
-	apimodel.SendAnalyticEvent(event, userId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
+	event := commons.NewUserDeletePhotoEvent(userId, originPhotoId)
+	commons.SendAnalyticEvent(event, userId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
 
 	partitionKey := userId
-	ok, errStr = apimodel.SendCommonEvent(event, userId, commonStreamName, partitionKey, awsKinesisClient, anlogger, lc)
+	ok, errStr = commons.SendCommonEvent(event, userId, commonStreamName, partitionKey, awsKinesisClient, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "delete_photo.go : userId [%s], return %s to client", userId, errStr)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	resp := apimodel.BaseResponse{}
+	resp := commons.BaseResponse{}
 	body, err := json.Marshal(resp)
 	if err != nil {
 		anlogger.Errorf(lc, "delete_photo.go : error while marshaling resp [%v] object for userId [%s] : %v", resp, userId, err)
-		anlogger.Errorf(lc, "delete_photo.go : userId [%s], return %s to client", userId, apimodel.InternalServerError)
-		return events.APIGatewayProxyResponse{StatusCode: 200, Body: apimodel.InternalServerError}, nil
+		anlogger.Errorf(lc, "delete_photo.go : userId [%s], return %s to client", userId, commons.InternalServerError)
+		return events.APIGatewayProxyResponse{StatusCode: 200, Body: commons.InternalServerError}, nil
 	}
 	anlogger.Debugf(lc, "delete_photo.go : return successful resp [%s] for userId [%s]", string(body), userId)
 	anlogger.Infof(lc, "delete_photo.go : successfully delete all photo based on photoId [%s] for userId [%s]", reqParam.PhotoId, userId)
@@ -221,9 +221,9 @@ func getAllPhotoIdsBasedOnSource(sourceId, userId string, lc *lambdacontext.Lamb
 	arr := strings.Split(sourceId, "_")
 	baseId := arr[1]
 	allIds := make([]string, 0)
-	originPhotoId, _ := apimodel.GetOriginPhotoId(userId, sourceId, anlogger, lc)
+	originPhotoId, _ := commons.GetOriginPhotoId(userId, sourceId, anlogger, lc)
 	allIds = append(allIds, originPhotoId)
-	for key, _ := range apimodel.AllowedPhotoResolution {
+	for key, _ := range commons.AllowedPhotoResolution {
 		allIds = append(allIds, key+"_"+baseId)
 	}
 	anlogger.Debugf(lc, "delete_photo.go : successfully cretae del photo id list based on photoId [%s] for userId [%s], del list=%v", sourceId, userId, allIds)
@@ -236,7 +236,7 @@ func markAsDel(userId, photoId string, lc *lambdacontext.LambdaContext) (bool, s
 	input :=
 		&dynamodb.UpdateItemInput{
 			ExpressionAttributeNames: map[string]*string{
-				"#deletedAt": aws.String(apimodel.PhotoDeletedAtColumnName),
+				"#deletedAt": aws.String(commons.PhotoDeletedAtColumnName),
 			},
 			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 				":deletedAtV": {
@@ -244,10 +244,10 @@ func markAsDel(userId, photoId string, lc *lambdacontext.LambdaContext) (bool, s
 				},
 			},
 			Key: map[string]*dynamodb.AttributeValue{
-				apimodel.UserIdColumnName: {
+				commons.UserIdColumnName: {
 					S: aws.String(userId),
 				},
-				apimodel.PhotoIdColumnName: {
+				commons.PhotoIdColumnName: {
 					S: aws.String(photoId),
 				},
 			},
@@ -257,7 +257,7 @@ func markAsDel(userId, photoId string, lc *lambdacontext.LambdaContext) (bool, s
 	_, err := awsDbClient.UpdateItem(input)
 	if err != nil {
 		anlogger.Errorf(lc, "delete_photo.go : error while delete photoId [%s] for userId [%s] : %v", photoId, userId, err)
-		return false, apimodel.InternalServerError
+		return false, commons.InternalServerError
 	}
 	anlogger.Debugf(lc, "delete_photo.go : successfully delete photoId [%s] for userId [%s]", photoId, userId)
 	return true, ""
@@ -269,12 +269,12 @@ func parseParams(params string, lc *lambdacontext.LambdaContext) (*apimodel.Dele
 	err := json.Unmarshal([]byte(params), &req)
 	if err != nil {
 		anlogger.Errorf(lc, "delete_photo.go : error marshaling required params from the string [%s] : %v", params, err)
-		return nil, false, apimodel.InternalServerError
+		return nil, false, commons.InternalServerError
 	}
 
 	if req.PhotoId == "" {
 		anlogger.Errorf(lc, "delete_photo.go : wrong required param photoId [%s]", req.PhotoId)
-		return nil, false, apimodel.WrongRequestParamsClientError
+		return nil, false, commons.WrongRequestParamsClientError
 	}
 
 	anlogger.Debugf(lc, "delete_photo.go : successfully parse request string [%s] to %v", params, req)

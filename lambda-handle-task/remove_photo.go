@@ -6,12 +6,12 @@ import (
 	"../apimodel"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/aws"
-	"../sys_log"
 	"encoding/json"
 	"errors"
+	"github.com/ringoid/commons"
 )
 
-func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *syslog.Logger) error {
+func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) error {
 	var rTask apimodel.RemovePhotoAsyncTask
 	err := json.Unmarshal([]byte(body), &rTask)
 	if err != nil {
@@ -25,7 +25,7 @@ func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *syslog.
 
 	//todo: we need to check if your was reported and don't delete origin photo
 
-	ok, errStr = apimodel.DeleteFromS3(userPhoto.Bucket, userPhoto.Key, rTask.UserId, awsS3Client, lc, anlogger)
+	ok, errStr = commons.DeleteFromS3(userPhoto.Bucket, userPhoto.Key, rTask.UserId, awsS3Client, lc, anlogger)
 	if !ok {
 		return errors.New(errStr)
 	}
@@ -49,15 +49,15 @@ func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *syslog.
 }
 
 //return userPhoto, ok and error string
-func getUserPhoto(userId, photoId, tableName string, lc *lambdacontext.LambdaContext, anlogger *syslog.Logger) (*apimodel.UserPhoto, bool, string) {
+func getUserPhoto(userId, photoId, tableName string, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) (*apimodel.UserPhoto, bool, string) {
 	anlogger.Debugf(lc, "remove_photo.go : get userPhoto for userId [%s], photoId [%s] from table [%s]",
 		userId, photoId, tableName)
 	input := &dynamodb.GetItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
-			apimodel.UserIdColumnName: {
+			commons.UserIdColumnName: {
 				S: aws.String(userId),
 			},
-			apimodel.PhotoIdColumnName: {
+			commons.PhotoIdColumnName: {
 				S: aws.String(photoId),
 			},
 		},
@@ -68,7 +68,7 @@ func getUserPhoto(userId, photoId, tableName string, lc *lambdacontext.LambdaCon
 	if err != nil {
 		anlogger.Errorf(lc, "remove_photo.go : error get item for userId [%s], photoId [%s] and table [%s] : %v",
 			userId, photoId, tableName, err)
-		return nil, false, apimodel.InternalServerError
+		return nil, false, commons.InternalServerError
 	}
 	if len(result.Item) == 0 {
 		anlogger.Warnf(lc, "remove_photo.go : there is no item for userId [%s], photoId [%s] and table [%s]",
@@ -77,8 +77,8 @@ func getUserPhoto(userId, photoId, tableName string, lc *lambdacontext.LambdaCon
 	}
 
 	res := apimodel.UserPhoto{
-		Bucket: *result.Item[apimodel.PhotoBucketColumnName].S,
-		Key:    *result.Item[apimodel.PhotoKeyColumnName].S,
+		Bucket: *result.Item[commons.PhotoBucketColumnName].S,
+		Key:    *result.Item[commons.PhotoKeyColumnName].S,
 	}
 	anlogger.Debugf(lc, "remove_photo.go : successfully get userPhoto %v for userId [%s], photoId [%s] and table [%s]",
 		res, userId, photoId, tableName)
@@ -87,14 +87,14 @@ func getUserPhoto(userId, photoId, tableName string, lc *lambdacontext.LambdaCon
 }
 
 //return ok and error string
-func deletePhotoFromDynamo(userId, photoId, tableName string, lc *lambdacontext.LambdaContext, anlogger *syslog.Logger) (bool, string) {
+func deletePhotoFromDynamo(userId, photoId, tableName string, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) (bool, string) {
 	anlogger.Debugf(lc, "remove_photo.go : delete photo using userId [%s] and photoId [%s] from tableName [%s]", userId, photoId, tableName)
 	input := &dynamodb.DeleteItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
-			apimodel.UserIdColumnName: {
+			commons.UserIdColumnName: {
 				S: aws.String(userId),
 			},
-			apimodel.PhotoIdColumnName: {
+			commons.PhotoIdColumnName: {
 				S: aws.String(photoId),
 			},
 		},

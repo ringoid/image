@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	basicLambda "github.com/aws/aws-lambda-go/lambda"
-	"../sys_log"
 	"../apimodel"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/aws"
@@ -19,9 +18,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"crypto/sha1"
 	"github.com/satori/go.uuid"
+	"github.com/ringoid/commons"
 )
 
-var anlogger *syslog.Logger
+var anlogger *commons.Logger
 var awsDbClient *dynamodb.DynamoDB
 var awsDeliveryStreamClient *firehose.Firehose
 var deliveryStreamName string
@@ -52,7 +52,7 @@ func init() {
 	}
 	fmt.Printf("lambda-initialization : get_presigned_url.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]\n", papertrailAddress)
 
-	anlogger, err = syslog.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "get-presign-url-image"))
+	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "get-presign-url-image"))
 	if err != nil {
 		fmt.Errorf("lambda-initialization : get_presigned_url.go : error during startup : %v\n", err)
 		os.Exit(1)
@@ -84,7 +84,7 @@ func init() {
 	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : start with ORIGIN_PHOTO_BUCKET_NAME = [%s]", originPhotoBucketName)
 
 	awsSession, err = session.NewSession(aws.NewConfig().
-		WithRegion(apimodel.Region).WithMaxRetries(apimodel.MaxRetries).
+		WithRegion(commons.Region).WithMaxRetries(commons.MaxRetries).
 		WithLogger(aws.LoggerFunc(func(args ...interface{}) { anlogger.AwsLog(args) })).WithLogLevel(aws.LogOff))
 	if err != nil {
 		anlogger.Fatalf(nil, "lambda-initialization : get_presigned_url.go : error during initialization : %v", err)
@@ -113,11 +113,11 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 
 	anlogger.Debugf(lc, "get_presigned_url.go : start handle request %v", request)
 
-	if apimodel.IsItWarmUpRequest(request.Body, anlogger, lc) {
+	if commons.IsItWarmUpRequest(request.Body, anlogger, lc) {
 		return events.APIGatewayProxyResponse{}, nil
 	}
 
-	appVersion, isItAndroid, ok, errStr := apimodel.ParseAppVersionFromHeaders(request.Headers, anlogger, lc)
+	appVersion, isItAndroid, ok, errStr := commons.ParseAppVersionFromHeaders(request.Headers, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "get_presigned_url.go : return %s to client", errStr)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
@@ -129,7 +129,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	userId, ok, _, errStr := apimodel.CallVerifyAccessToken(appVersion, isItAndroid, reqParam.AccessToken, internalAuthFunctionName, clientLambda, anlogger, lc)
+	userId, ok, _, errStr := commons.CallVerifyAccessToken(appVersion, isItAndroid, reqParam.AccessToken, internalAuthFunctionName, clientLambda, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "get_presigned_url.go : return %s to client", errStr)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
@@ -159,8 +159,8 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	event := apimodel.NewUserAskUploadLinkEvent(originPhotoBucketName, s3Key, userId)
-	apimodel.SendAnalyticEvent(event, userId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
+	event := commons.NewUserAskUploadLinkEvent(originPhotoBucketName, s3Key, userId)
+	commons.SendAnalyticEvent(event, userId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
 
 	resp := apimodel.GetPresignUrlResp{
 		Uri:           uri,
@@ -170,8 +170,8 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	body, err := json.Marshal(resp)
 	if err != nil {
 		anlogger.Errorf(lc, "get_presigned_url.go : error while marshaling resp [%v] object for userId [%s] : %v", resp, userId, err)
-		anlogger.Errorf(lc, "get_presigned_url.go : userId [%s], return %s to client", userId, apimodel.InternalServerError)
-		return events.APIGatewayProxyResponse{StatusCode: 200, Body: apimodel.InternalServerError}, nil
+		anlogger.Errorf(lc, "get_presigned_url.go : userId [%s], return %s to client", userId, commons.InternalServerError)
+		return events.APIGatewayProxyResponse{StatusCode: 200, Body: commons.InternalServerError}, nil
 	}
 	anlogger.Debugf(lc, "get_presigned_url.go : return successful resp [%s] for userId [%s]", string(body), userId)
 	return events.APIGatewayProxyResponse{StatusCode: 200, Body: string(body)}, nil
@@ -184,8 +184,8 @@ func createPhotoIdUserIdMapping(photoId, userId string, lc *lambdacontext.Lambda
 	input :=
 		&dynamodb.UpdateItemInput{
 			ExpressionAttributeNames: map[string]*string{
-				"#userId": aws.String(apimodel.UserIdColumnName),
-				"#time":   aws.String(apimodel.UpdatedTimeColumnName),
+				"#userId": aws.String(commons.UserIdColumnName),
+				"#time":   aws.String(commons.UpdatedTimeColumnName),
 			},
 			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 				":uV": {
@@ -196,11 +196,11 @@ func createPhotoIdUserIdMapping(photoId, userId string, lc *lambdacontext.Lambda
 				},
 			},
 			Key: map[string]*dynamodb.AttributeValue{
-				apimodel.PhotoIdColumnName: {
+				commons.PhotoIdColumnName: {
 					S: aws.String(photoId),
 				},
 			},
-			ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%v)", apimodel.PhotoIdColumnName)),
+			ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%v)", commons.PhotoIdColumnName)),
 
 			TableName:        aws.String(photoUserMappingTableName),
 			UpdateExpression: aws.String("SET #userId = :uV, #time = :tV"),
@@ -216,7 +216,7 @@ func createPhotoIdUserIdMapping(photoId, userId string, lc *lambdacontext.Lambda
 			}
 		}
 		anlogger.Errorf(lc, "get_presigned_url.go : error while create mapping between photoId [%s] and userId [%s] : %v", photoId, userId, err)
-		return false, false, apimodel.InternalServerError
+		return false, false, commons.InternalServerError
 	}
 	anlogger.Debugf(lc, "get_presigned_url.go : successfully create mapping between photoId [%s] and userId [%s]", photoId, userId)
 	return true, false, ""
@@ -228,18 +228,18 @@ func generatePhotoId(userId string, lc *lambdacontext.LambdaContext) (string, bo
 	saltForPhotoId, err := uuid.NewV4()
 	if err != nil {
 		anlogger.Errorf(lc, "get_presigned_url.go : error while generate salt for photoId, userId [%s] : %v", userId, err)
-		return "", false, apimodel.InternalServerError
+		return "", false, commons.InternalServerError
 	}
 	sha := sha1.New()
 	_, err = sha.Write([]byte(userId))
 	if err != nil {
 		anlogger.Errorf(lc, "get_presigned_url.go : error while write userId to sha algo, userId [%s] : %v", userId, err)
-		return "", false, apimodel.InternalServerError
+		return "", false, commons.InternalServerError
 	}
 	_, err = sha.Write([]byte(saltForPhotoId.String()))
 	if err != nil {
 		anlogger.Errorf(lc, "get_presigned_url.go : error while write salt to sha algo, userId [%s] : %v", userId, err)
-		return "", false, apimodel.InternalServerError
+		return "", false, commons.InternalServerError
 	}
 	resultPhotoId := fmt.Sprintf("%x", sha.Sum(nil))
 	anlogger.Debugf(lc, "get_presigned_url.go : successfully generate photoId [%s] for userId [%s]", resultPhotoId, userId)
@@ -252,17 +252,17 @@ func parseParams(params string, lc *lambdacontext.LambdaContext) (*apimodel.GetP
 	err := json.Unmarshal([]byte(params), &req)
 	if err != nil {
 		anlogger.Errorf(lc, "get_presigned_url.go : error marshaling required params from the string [%s] : %v", params, err)
-		return nil, false, apimodel.InternalServerError
+		return nil, false, commons.InternalServerError
 	}
 
 	if req.Extension == "" {
 		anlogger.Errorf(lc, "get_presigned_url.go : wrong required param extension [%s]", req.Extension)
-		return nil, false, apimodel.WrongRequestParamsClientError
+		return nil, false, commons.WrongRequestParamsClientError
 	}
 
 	if req.ClientPhotoId == "" {
 		anlogger.Errorf(lc, "get_presigned_url.go : wrong required param clientPhotoId [%s]", req.ClientPhotoId)
-		return nil, false, apimodel.WrongRequestParamsClientError
+		return nil, false, commons.WrongRequestParamsClientError
 	}
 
 	anlogger.Debugf(lc, "get_presigned_url.go : successfully parse request string [%s] to %v", params, req)
@@ -282,20 +282,20 @@ func makePresignUrl(userId, bucket, key, functionName string, lc *lambdacontext.
 	jsonBody, err := json.Marshal(req)
 	if err != nil {
 		anlogger.Errorf(lc, "get_presigned_url.go : error marshaling req %s into json, for userId [%s] : %v", req, userId, err)
-		return "", false, apimodel.InternalServerError
+		return "", false, commons.InternalServerError
 	}
 
 	resp, err := clientLambda.Invoke(&lambda.InvokeInput{FunctionName: aws.String(functionName), Payload: jsonBody})
 	if err != nil {
 		anlogger.Errorf(lc, "get_presigned_url.go : error invoke function [%s] with body %s, for userId [%s] : %v",
 			functionName, jsonBody, userId, err)
-		return "", false, apimodel.InternalServerError
+		return "", false, commons.InternalServerError
 	}
 
 	if *resp.StatusCode != 200 {
 		anlogger.Errorf(lc, "get_presigned_url.go : status code = %d, response body %s for request %s, for userId [%s]",
 			*resp.StatusCode, string(resp.Payload), jsonBody, userId)
-		return "", false, apimodel.InternalServerError
+		return "", false, commons.InternalServerError
 	}
 
 	var response apimodel.MakePresignUrlInternalResp
@@ -303,7 +303,7 @@ func makePresignUrl(userId, bucket, key, functionName string, lc *lambdacontext.
 	if err != nil {
 		anlogger.Errorf(lc, "get_presigned_url.go : error unmarshaling response %s into json, for userId [%s] : %v",
 			string(resp.Payload), userId, err)
-		return "", false, apimodel.InternalServerError
+		return "", false, commons.InternalServerError
 	}
 
 	anlogger.Debugf(lc, "get_presigned_url.go : successfully made pre-sign url [%s], for userId [%s]", response.Uri, userId)

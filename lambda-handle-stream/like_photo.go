@@ -2,29 +2,28 @@ package main
 
 import (
 	"github.com/aws/aws-lambda-go/lambdacontext"
-	"../sys_log"
-	"../apimodel"
 	"fmt"
 	"encoding/json"
 	"errors"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/ringoid/commons"
 )
 
-func likePhoto(body []byte, userPhotoTable string, awsDbClient *dynamodb.DynamoDB, lc *lambdacontext.LambdaContext, anlogger *syslog.Logger) error {
+func likePhoto(body []byte, userPhotoTable string, awsDbClient *dynamodb.DynamoDB, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) error {
 	anlogger.Debugf(lc, "like_photo.go : handle event and like photo, body %s", string(body))
-	var aEvent apimodel.PhotoLikeInternalEvent
+	var aEvent commons.PhotoLikeInternalEvent
 	err := json.Unmarshal([]byte(body), &aEvent)
 	if err != nil {
 		anlogger.Errorf(lc, "like_photo.go : error unmarshal body [%s] to ImageRemovePhotoTaskType: %v", string(body), err)
 		return errors.New(fmt.Sprintf("error unmarshal body %s : %v", string(body), err))
 	}
-	userPhotoMetaPartitionKey := aEvent.UserId + apimodel.PhotoPrimaryKeyMetaPostfix
+	userPhotoMetaPartitionKey := aEvent.UserId + commons.PhotoPrimaryKeyMetaPostfix
 
 	input :=
 		&dynamodb.UpdateItemInput{
 			ExpressionAttributeNames: map[string]*string{
-				"#like": aws.String(apimodel.PhotoLikesColumnName),
+				"#like": aws.String(commons.PhotoLikesColumnName),
 			},
 			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 				":likeV": {
@@ -32,10 +31,10 @@ func likePhoto(body []byte, userPhotoTable string, awsDbClient *dynamodb.DynamoD
 				},
 			},
 			Key: map[string]*dynamodb.AttributeValue{
-				apimodel.UserIdColumnName: {
+				commons.UserIdColumnName: {
 					S: aws.String(userPhotoMetaPartitionKey),
 				},
-				apimodel.PhotoIdColumnName: {
+				commons.PhotoIdColumnName: {
 					S: aws.String(aEvent.OriginalPhotoId),
 				},
 			},

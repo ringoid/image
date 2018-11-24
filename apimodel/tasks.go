@@ -6,8 +6,6 @@ const (
 	ImageRemovePhotoTaskType    = "IMAGE_REMOVE_PHOTO"
 	ImageResizePhotoTaskType    = "IMAGE_RESIZE_PHOTO"
 	ImageRemoveS3ObjectTaskType = "IMAGE_REMOVE_S3_OBJECT"
-
-	AuthCheckVerificationCompeteTask = "AUTH_CHECK_VERIFICATION_COMPLETE"
 )
 
 type AsyncTask struct {
@@ -87,21 +85,5 @@ func NewResizePhotoAsyncTask(userId, photoId, photoType, sourceBucket, sourceKey
 		TargetBucket: targetBucket,
 		TargetKey:    targetKey,
 		TableName:    tableName,
-	}
-}
-
-type CheckVerificationCompleteTask struct {
-	Phone     string `json:"phone"`
-	TableName string `json:"tableName"`
-}
-
-func (task CheckVerificationCompleteTask) String() string {
-	return fmt.Sprintf("%#v", task)
-}
-
-func NewCheckVerificationCompleteTask(phone, table string) *CheckVerificationCompleteTask {
-	return &CheckVerificationCompleteTask{
-		Phone:     phone,
-		TableName: table,
 	}
 }

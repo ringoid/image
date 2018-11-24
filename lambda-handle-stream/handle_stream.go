@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	basicLambda "github.com/aws/aws-lambda-go/lambda"
-	"../sys_log"
-	"../apimodel"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/aws"
 	"os"
@@ -14,9 +12,10 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"errors"
+	"github.com/ringoid/commons"
 )
 
-var anlogger *syslog.Logger
+var anlogger *commons.Logger
 var awsDbClient *dynamodb.DynamoDB
 var userPhotoTable string
 
@@ -41,7 +40,7 @@ func init() {
 	}
 	fmt.Printf("lambda-initialization : handle_stream.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]\n", papertrailAddress)
 
-	anlogger, err = syslog.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-handle-stream-image"))
+	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-handle-stream-image"))
 	if err != nil {
 		fmt.Errorf("lambda-initialization : handle_stream.go : error during startup : %v\n", err)
 		os.Exit(1)
@@ -55,7 +54,7 @@ func init() {
 	anlogger.Debugf(nil, "lambda-initialization : handle_stream.go : start with USER_PHOTO_TABLE = [%s]", userPhotoTable)
 
 	awsSession, err = session.NewSession(aws.NewConfig().
-		WithRegion(apimodel.Region).WithMaxRetries(apimodel.MaxRetries).
+		WithRegion(commons.Region).WithMaxRetries(commons.MaxRetries).
 		WithLogger(aws.LoggerFunc(func(args ...interface{}) { anlogger.AwsLog(args) })).WithLogLevel(aws.LogOff))
 	if err != nil {
 		anlogger.Fatalf(nil, "lambda-initialization : handle_stream.go : error during initialization : %v", err)
@@ -76,14 +75,14 @@ func handler(ctx context.Context, event events.KinesisEvent) (error) {
 		anlogger.Debugf(lc, "handle_stream.go : handle record %v", record)
 		body := record.Kinesis.Data
 
-		var aEvent apimodel.BaseInternalEvent
+		var aEvent commons.BaseInternalEvent
 		err := json.Unmarshal(body, &aEvent)
 		if err != nil {
 			anlogger.Errorf(lc, "handle_stream.go : error unmarshal body [%s] to BaseInternalEvent : %v", body, err)
 			return errors.New(fmt.Sprintf("error unmarshal body %s : %v", body, err))
 		}
 		switch aEvent.EventType {
-		case apimodel.LikePhotoInternalEvent:
+		case commons.LikePhotoInternalEvent:
 			err = likePhoto(body, userPhotoTable, awsDbClient, lc, anlogger)
 			if err != nil {
 				return err

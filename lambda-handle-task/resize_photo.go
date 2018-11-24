@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/anthonynsimon/bild/imgio"
 	"github.com/aws/aws-lambda-go/lambdacontext"
-	"../sys_log"
 	"../apimodel"
 	"bytes"
 	"fmt"
@@ -15,11 +14,10 @@ import (
 	"github.com/anthonynsimon/bild/transform"
 	"image"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/ringoid/commons"
 )
 
-const defaultJPEGQuality = 80
-
-func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3manager.Uploader, awsDbClient *dynamodb.DynamoDB, lc *lambdacontext.LambdaContext, anlogger *syslog.Logger) error {
+func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3manager.Uploader, awsDbClient *dynamodb.DynamoDB, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) error {
 	anlogger.Debugf(lc, "resize_photo.go : resize photo by request body [%s]", body)
 	var rTask apimodel.ResizePhotoAsyncTask
 	err := json.Unmarshal([]byte(body), &rTask)
@@ -36,7 +34,7 @@ func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3mana
 	if err != nil {
 		anlogger.Errorf(lc, "resize_photo.go : error decode image file from bucket [%s], key [%s] for userId [%s] : %v",
 			rTask.SourceBucket, rTask.SourceKey, rTask.UserId, err)
-		return errors.New(apimodel.InternalServerError)
+		return errors.New(commons.InternalServerError)
 	}
 
 	width := rTask.TargetWidth
@@ -44,11 +42,11 @@ func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3mana
 
 	resized := transform.Resize(img, width, height, transform.Linear)
 	result := bytes.Buffer{}
-	err = imgio.JPEGEncoder(defaultJPEGQuality)(&result, resized)
+	err = imgio.JPEGEncoder(commons.DefaultJPEGQuality)(&result, resized)
 	if err != nil {
 		anlogger.Errorf(lc, "resize_photo.go : error encode image file from bucket [%s], key [%s] with target width [%d] and target height [%d] for userId [%s] : %v",
 			rTask.SourceBucket, rTask.SourceKey, width, height, rTask.UserId, err)
-		return errors.New(apimodel.InternalServerError)
+		return errors.New(commons.InternalServerError)
 	}
 	link := fmt.Sprintf("https://s3-eu-west-1.amazonaws.com/%s/%s", rTask.TargetBucket, rTask.TargetKey)
 	userPhoto := &apimodel.UserPhoto{
@@ -78,7 +76,7 @@ func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3mana
 }
 
 //return image, ok and error string
-func getImage(bucket, key, userId string, downloader *s3manager.Downloader, lc *lambdacontext.LambdaContext, anlogger *syslog.Logger) ([]byte, bool, string) {
+func getImage(bucket, key, userId string, downloader *s3manager.Downloader, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) ([]byte, bool, string) {
 	anlogger.Debugf(lc, "resize_photo.go : get image from bucket [%s] with a key [%s] for userId [%s]", bucket, key, userId)
 
 	buff := &aws.WriteAtBuffer{}
@@ -89,14 +87,14 @@ func getImage(bucket, key, userId string, downloader *s3manager.Downloader, lc *
 	if err != nil {
 		anlogger.Errorf(lc, "resize_photo.go : error downloading image from bucket [%s] with a key [%s] for userId [%s] : %v",
 			bucket, key, userId, err)
-		return nil, false, apimodel.InternalServerError
+		return nil, false, commons.InternalServerError
 	}
 	anlogger.Debugf(lc, "resize_photo.go : successfully got image from bucket [%s] with a key [%s] for userId [%s]", bucket, key, userId)
 	return buff.Bytes(), true, ""
 }
 
 //return ok and error string
-func uploadImage(source []byte, bucket, key, userId string, uploader *s3manager.Uploader, lc *lambdacontext.LambdaContext, anlogger *syslog.Logger) (bool, string) {
+func uploadImage(source []byte, bucket, key, userId string, uploader *s3manager.Uploader, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) (bool, string) {
 	anlogger.Debugf(lc, "resize_photo.go : upload image to bucket [%s] with a key [%s] for userId [%s]", bucket, key, userId)
 	_, err := uploader.Upload(&s3manager.UploadInput{
 		Bucket: aws.String(bucket),
@@ -106,7 +104,7 @@ func uploadImage(source []byte, bucket, key, userId string, uploader *s3manager.
 	})
 	if err != nil {
 		anlogger.Errorf(lc, "resize_photo.go : error upload image to bucket [%s] with a key [%s] for userId [%s] : %v", bucket, key, userId, err)
-		return false, apimodel.InternalServerError
+		return false, commons.InternalServerError
 	}
 	anlogger.Debugf(lc, "resize_photo.go : successfully uploaded image to bucket [%s] with a key [%s] for userId [%s]", bucket, key, userId)
 	return true, ""

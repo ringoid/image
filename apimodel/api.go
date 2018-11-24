@@ -2,36 +2,8 @@ package apimodel
 
 import (
 	"fmt"
+	"github.com/ringoid/commons"
 )
-
-type WarmUpRequest struct {
-	WarmUpRequest bool `json:"warmUpRequest"`
-}
-
-func (req WarmUpRequest) String() string {
-	return fmt.Sprintf("%#v", req)
-}
-
-type InternalGetUserIdReq struct {
-	WarmUpRequest bool   `json:"warmUpRequest"`
-	AccessToken   string `json:"accessToken"`
-	BuildNum      int    `json:"buildNum"`
-	IsItAndroid   bool   `json:"isItAndroid"`
-}
-
-func (req InternalGetUserIdReq) String() string {
-	return fmt.Sprintf("%#v", req)
-}
-
-type InternalGetUserIdResp struct {
-	BaseResponse
-	UserId         string `json:"userId"`
-	IsUserReported bool   `json:"isUserReported"`
-}
-
-func (resp InternalGetUserIdResp) String() string {
-	return fmt.Sprintf("%#v", resp)
-}
 
 type GetPresignUrlReq struct {
 	WarmUpRequest bool   `json:"warmUpRequest"`
@@ -45,7 +17,7 @@ func (req GetPresignUrlReq) String() string {
 }
 
 type GetPresignUrlResp struct {
-	BaseResponse
+	commons.BaseResponse
 	Uri           string `json:"uri"`
 	OriginPhotoId string `json:"originPhotoId"`
 	ClientPhotoId string `json:"clientPhotoId"`
@@ -74,7 +46,7 @@ func (resp MakePresignUrlInternalResp) String() string {
 }
 
 type GetOwnPhotosResp struct {
-	BaseResponse
+	commons.BaseResponse
 	Photos []OwnPhoto `json:"photos"`
 }
 
@@ -122,7 +94,7 @@ func (p Photo) String() string {
 }
 
 type GetNewFacesResp struct {
-	BaseResponse
+	commons.BaseResponse
 	WarmUpRequest bool      `json:"warmUpRequest"`
 	Profiles      []Profile `json:"profiles"`
 }

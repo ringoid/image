@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	basicLambda "github.com/aws/aws-lambda-go/lambda"
-	"../sys_log"
 	"../apimodel"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/aws"
@@ -20,9 +19,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/kinesis"
+	"github.com/ringoid/commons"
 )
 
-var anlogger *syslog.Logger
+var anlogger *commons.Logger
 var awsDbClient *dynamodb.DynamoDB
 var awsDeliveryStreamClient *firehose.Firehose
 var deliveryStreamName string
@@ -40,8 +40,6 @@ var awsSqsClient *sqs.SQS
 var asyncTaskQueue string
 var commonStreamName string
 var awsKinesisClient *kinesis.Kinesis
-
-const defaultMaxPhotoSize = 20000000 //20 Mb
 
 func init() {
 	var env string
@@ -64,7 +62,7 @@ func init() {
 	}
 	fmt.Printf("lambda-initialization : internal_handle_upload.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]\n", papertrailAddress)
 
-	anlogger, err = syslog.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-handle-upload-image"))
+	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-handle-upload-image"))
 	if err != nil {
 		fmt.Errorf("lambda-initialization : internal_handle_upload.go : error during startup : %v\n", err)
 		os.Exit(1)
@@ -114,7 +112,7 @@ func init() {
 	anlogger.Debugf(nil, "lambda-initialization : internal_handle_upload.go : start with ASYNC_TASK_SQS_QUEUE = [%s]", asyncTaskQueue)
 
 	awsSession, err = session.NewSession(aws.NewConfig().
-		WithRegion(apimodel.Region).WithMaxRetries(apimodel.MaxRetries).
+		WithRegion(commons.Region).WithMaxRetries(commons.MaxRetries).
 		WithLogger(aws.LoggerFunc(func(args ...interface{}) { anlogger.AwsLog(args) })).WithLogLevel(aws.LogOff))
 	if err != nil {
 		anlogger.Fatalf(nil, "lambda-initialization : internal_handle_upload.go : error during initialization : %v", err)
@@ -183,7 +181,7 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 		}
 
 		//todo: uncomment before prod
-		//if objectSize >= defaultMaxPhotoSize {
+		//if objectSize >= commons.DefaultMaxPhotoSize {
 		//	anlogger.Warnf(lc, "internal_handle_upload.go : uploaded object too big, bucket [%s], objectKey [%s], objectSize [%v] for userId [%s]",
 		//		objectBucket, objectKey, objectSize, userId)
 		//	task := apimodel.NewRemoveS3ObjectAsyncTask(objectBucket, objectKey)
@@ -219,7 +217,7 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 			anlogger.Warnf(lc, "internal_handle_upload.go : uploaded object was already deleted, bucket [%s], objectKey [%s], objectSize [%v] for userId [%s]",
 				objectBucket, objectKey, objectSize, userId)
 			task := apimodel.NewRemoveS3ObjectAsyncTask(objectBucket, objectKey)
-			ok, errStr = apimodel.SendAsyncTask(task, asyncTaskQueue, userId, 0, awsSqsClient, anlogger, lc)
+			ok, errStr = commons.SendAsyncTask(task, asyncTaskQueue, userId, 0, awsSqsClient, anlogger, lc)
 			if !ok {
 				return errors.New(errStr)
 			}
@@ -229,22 +227,22 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 
 		anlogger.Infof(lc, "internal_handle_upload.go : successfully save origin photo %v for userId [%s]", userPhoto, userPhoto.UserId)
 
-		event := apimodel.NewUserUploadedPhotoEvent(userPhoto)
-		apimodel.SendAnalyticEvent(event, userPhoto.UserId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
+		event := commons.NewUserUploadedPhotoEvent(userPhoto.UserId, userPhoto.Bucket, userPhoto.Key, userPhoto.PhotoId, userPhoto.PhotoType, userPhoto.Size)
+		commons.SendAnalyticEvent(event, userPhoto.UserId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
 
 		partitionKey := userId
-		ok, errStr = apimodel.SendCommonEvent(event, userId, commonStreamName, partitionKey, awsKinesisClient, anlogger, lc)
+		ok, errStr = commons.SendCommonEvent(event, userId, commonStreamName, partitionKey, awsKinesisClient, anlogger, lc)
 		if !ok {
 			return errors.New(errStr)
 		}
 
-		for resolution := range apimodel.AllowedPhotoResolution {
-			width := apimodel.ResolutionValues[resolution+"_width"]
-			height := apimodel.ResolutionValues[resolution+"_height"]
+		for resolution := range commons.AllowedPhotoResolution {
+			width := commons.ResolutionValues[resolution+"_width"]
+			height := commons.ResolutionValues[resolution+"_height"]
 			resizedPhotoId := resolution + "_" + originS3PhotoId
 			targetKey := originS3PhotoId + "_" + resolution + extension
 			task := apimodel.NewResizePhotoAsyncTask(userId, resizedPhotoId, resolution, objectBucket, objectKey, publicPhotoBucketName, targetKey, userPhotoTable, width, height)
-			ok, errStr = apimodel.SendAsyncTask(task, asyncTaskQueue, userId, 0, awsSqsClient, anlogger, lc)
+			ok, errStr = commons.SendAsyncTask(task, asyncTaskQueue, userId, 0, awsSqsClient, anlogger, lc)
 			if !ok {
 				return errors.New(errStr)
 			}
@@ -259,7 +257,7 @@ func getOwner(objectKey string, lc *lambdacontext.LambdaContext) (string, bool, 
 	anlogger.Debugf(lc, "internal_handle_upload.go : find owner of object with a key [%s]", objectKey)
 	input := &dynamodb.GetItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
-			apimodel.PhotoIdColumnName: {
+			commons.PhotoIdColumnName: {
 				S: aws.String(objectKey),
 			},
 		},
@@ -270,7 +268,7 @@ func getOwner(objectKey string, lc *lambdacontext.LambdaContext) (string, bool, 
 	result, err := awsDbClient.GetItem(input)
 	if err != nil {
 		anlogger.Errorf(lc, "internal_handle_upload.go : error reading owner by object key [%s] : %v", objectKey, err)
-		return "", false, apimodel.InternalServerError
+		return "", false, commons.InternalServerError
 	}
 
 	anlogger.Debugf(lc, "result : %v", result.Item)
@@ -281,7 +279,7 @@ func getOwner(objectKey string, lc *lambdacontext.LambdaContext) (string, bool, 
 		return "", true, ""
 	}
 
-	userId := *result.Item[apimodel.UserIdColumnName].S
+	userId := *result.Item[commons.UserIdColumnName].S
 	anlogger.Debugf(lc, "internal_handle_upload.go : found owner with userId [%s] for object key [%s]", userId, objectKey)
 	return userId, true, ""
 }

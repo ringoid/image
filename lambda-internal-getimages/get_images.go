@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	basicLambda "github.com/aws/aws-lambda-go/lambda"
-	"../sys_log"
 	"../apimodel"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/aws"
@@ -11,9 +10,10 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-lambda-go/lambdacontext"
+	"github.com/ringoid/commons"
 )
 
-var anlogger *syslog.Logger
+var anlogger *commons.Logger
 var awsDbClient *dynamodb.DynamoDB
 var userPhotoTable string
 
@@ -40,7 +40,7 @@ func init() {
 	}
 	fmt.Printf("lambda-initialization : get_images.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]\n", papertrailAddress)
 
-	anlogger, err = syslog.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-get-images-image"))
+	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-get-images-image"))
 	if err != nil {
 		fmt.Errorf("lambda-initialization : get_images.go : error during startup : %v\n", err)
 		os.Exit(1)
@@ -55,7 +55,7 @@ func init() {
 	anlogger.Debugf(nil, "lambda-initialization : get_images.go : start with USER_PHOTO_TABLE = [%s]", userPhotoTable)
 
 	awsSession, err = session.NewSession(aws.NewConfig().
-		WithRegion(apimodel.Region).WithMaxRetries(apimodel.MaxRetries).
+		WithRegion(commons.Region).WithMaxRetries(commons.MaxRetries).
 		WithLogger(aws.LoggerFunc(func(args ...interface{}) { anlogger.AwsLog(args) })).WithLogLevel(aws.LogOff))
 	if err != nil {
 		anlogger.Fatalf(nil, "lambda-initialization : get_images.go : error during initialization : %v", err)
@@ -122,10 +122,10 @@ func photos(userIdPhotos []map[string]string, respChan chan<- map[string]string,
 	for _, paramMap := range userIdPhotos {
 		eachMap := make(map[string]*dynamodb.AttributeValue)
 		for k, v := range paramMap {
-			eachMap[apimodel.UserIdColumnName] = &dynamodb.AttributeValue{
+			eachMap[commons.UserIdColumnName] = &dynamodb.AttributeValue{
 				S: aws.String(k),
 			}
-			eachMap[apimodel.PhotoIdColumnName] = &dynamodb.AttributeValue{
+			eachMap[commons.PhotoIdColumnName] = &dynamodb.AttributeValue{
 				S: aws.String(v),
 			}
 		}
@@ -157,15 +157,15 @@ func photos(userIdPhotos []map[string]string, respChan chan<- map[string]string,
 	resultMap := make(map[string]string)
 	for _, attributeList := range result.Responses {
 		for _, eachAttr := range attributeList {
-			targetUserId := *eachAttr[apimodel.UserIdColumnName].S
-			targetPhotoId := *eachAttr[apimodel.PhotoIdColumnName].S
-			_, wasPhotoDeleted := eachAttr[apimodel.PhotoDeletedAtColumnName]
-			_, wasHidden := eachAttr[apimodel.PhotoHiddenAtColumnName]
+			targetUserId := *eachAttr[commons.UserIdColumnName].S
+			targetPhotoId := *eachAttr[commons.PhotoIdColumnName].S
+			_, wasPhotoDeleted := eachAttr[commons.PhotoDeletedAtColumnName]
+			_, wasHidden := eachAttr[commons.PhotoHiddenAtColumnName]
 			if wasPhotoDeleted || wasHidden {
 				anlogger.Debugf(lc, "get_images.go : photo with userId [%s] and photoId [%s] is deleted or hidden, so exclude it from response", targetUserId, targetPhotoId)
 				continue
 			}
-			targetPhotoUriAttr, ok := eachAttr[apimodel.PhotoSourceUriColumnName]
+			targetPhotoUriAttr, ok := eachAttr[commons.PhotoSourceUriColumnName]
 			if !ok {
 				anlogger.Debugf(lc, "get_images.go : photo with userId [%s] and photoId [%s] don't have uri, so exclude it from response", targetUserId, targetPhotoId)
 				continue
