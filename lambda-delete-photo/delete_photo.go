@@ -14,7 +14,6 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go/service/lambda"
-	"time"
 	"strings"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/kinesis"
@@ -168,7 +167,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 
 	photoIds, originPhotoId := getAllPhotoIdsBasedOnSource(reqParam.PhotoId, userId, lc)
 	for _, val := range photoIds {
-		ok, errStr := markAsDel(userId, val, lc)
+		ok, errStr := apimodel.MarkPhotoAsDel(userId, val, userPhotoTable, awsDbClient, anlogger, lc)
 		if !ok {
 			anlogger.Errorf(lc, "delete_photo.go : userId [%s], return %s to client", userId, errStr)
 			return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
@@ -188,7 +187,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	}
 
 	//Mark photo meta info like deleted also
-	ok, errStr = markAsDel(userId+commons.PhotoPrimaryKeyMetaPostfix, originPhotoId, lc)
+	ok, errStr = apimodel.MarkPhotoAsDel(userId+commons.PhotoPrimaryKeyMetaPostfix, originPhotoId, userPhotoTable, awsDbClient, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "delete_photo.go : userId [%s], return %s to client", userId, errStr)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
@@ -228,39 +227,6 @@ func getAllPhotoIdsBasedOnSource(sourceId, userId string, lc *lambdacontext.Lamb
 	}
 	anlogger.Debugf(lc, "delete_photo.go : successfully cretae del photo id list based on photoId [%s] for userId [%s], del list=%v", sourceId, userId, allIds)
 	return allIds, originPhotoId
-}
-
-//return ok and error string
-func markAsDel(userId, photoId string, lc *lambdacontext.LambdaContext) (bool, string) {
-	anlogger.Debugf(lc, "delete_photo.go : mark photoId [%s] as deleted for userId [%s]", photoId, userId)
-	input :=
-		&dynamodb.UpdateItemInput{
-			ExpressionAttributeNames: map[string]*string{
-				"#deletedAt": aws.String(commons.PhotoDeletedAtColumnName),
-			},
-			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-				":deletedAtV": {
-					S: aws.String(time.Now().UTC().Format("2006-01-02-15-04-05.000")),
-				},
-			},
-			Key: map[string]*dynamodb.AttributeValue{
-				commons.UserIdColumnName: {
-					S: aws.String(userId),
-				},
-				commons.PhotoIdColumnName: {
-					S: aws.String(photoId),
-				},
-			},
-			TableName:        aws.String(userPhotoTable),
-			UpdateExpression: aws.String("SET #deletedAt = :deletedAtV"),
-		}
-	_, err := awsDbClient.UpdateItem(input)
-	if err != nil {
-		anlogger.Errorf(lc, "delete_photo.go : error while delete photoId [%s] for userId [%s] : %v", photoId, userId, err)
-		return false, commons.InternalServerError
-	}
-	anlogger.Debugf(lc, "delete_photo.go : successfully delete photoId [%s] for userId [%s]", photoId, userId)
-	return true, ""
 }
 
 func parseParams(params string, lc *lambdacontext.LambdaContext) (*apimodel.DeletePhotoReq, bool, string) {

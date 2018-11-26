@@ -13,11 +13,15 @@ import (
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"errors"
 	"github.com/ringoid/commons"
+	"github.com/aws/aws-sdk-go/service/sqs"
 )
 
 var anlogger *commons.Logger
 var awsDbClient *dynamodb.DynamoDB
 var userPhotoTable string
+
+var asyncTaskQueue string
+var awsSqsClient *sqs.SQS
 
 func init() {
 	var env string
@@ -53,6 +57,12 @@ func init() {
 	}
 	anlogger.Debugf(nil, "lambda-initialization : handle_stream.go : start with USER_PHOTO_TABLE = [%s]", userPhotoTable)
 
+	asyncTaskQueue, ok = os.LookupEnv("ASYNC_TASK_SQS_QUEUE")
+	if !ok {
+		anlogger.Fatalf(nil, "lambda-initialization : handle_stream.go : env can not be empty ASYNC_TASK_SQS_QUEUE")
+	}
+	anlogger.Debugf(nil, "lambda-initialization : handle_stream.go : start with ASYNC_TASK_SQS_QUEUE = [%s]", asyncTaskQueue)
+
 	awsSession, err = session.NewSession(aws.NewConfig().
 		WithRegion(commons.Region).WithMaxRetries(commons.MaxRetries).
 		WithLogger(aws.LoggerFunc(func(args ...interface{}) { anlogger.AwsLog(args) })).WithLogLevel(aws.LogOff))
@@ -64,6 +74,8 @@ func init() {
 	awsDbClient = dynamodb.New(awsSession)
 	anlogger.Debugf(nil, "lambda-initialization : handle_stream.go : dynamodb client was successfully initialized")
 
+	awsSqsClient = sqs.New(awsSession)
+	anlogger.Debugf(nil, "lambda-initialization : handle_stream.go : sqs client was successfully initialized")
 }
 
 func handler(ctx context.Context, event events.KinesisEvent) (error) {
@@ -84,6 +96,11 @@ func handler(ctx context.Context, event events.KinesisEvent) (error) {
 		switch aEvent.EventType {
 		case commons.LikePhotoInternalEvent:
 			err = likePhoto(body, userPhotoTable, awsDbClient, lc, anlogger)
+			if err != nil {
+				return err
+			}
+		case commons.UserDeleteHimselfEvent:
+			err = deleteAllPhotos(body, userPhotoTable, asyncTaskQueue, awsSqsClient, awsDbClient, lc, anlogger)
 			if err != nil {
 				return err
 			}

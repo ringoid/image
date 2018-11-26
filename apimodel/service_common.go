@@ -77,3 +77,36 @@ func SavePhoto(userPhoto *UserPhoto, userPhotoTable string, awsDbClient *dynamod
 	anlogger.Debugf(lc, "common_action.go : successfully save photo %v for userId [%s]", userPhoto, userPhoto.UserId)
 	return true, ""
 }
+
+//return ok and error string
+func MarkPhotoAsDel(userId, photoId, tableName string, awsDbClient *dynamodb.DynamoDB, anlogger *commons.Logger, lc *lambdacontext.LambdaContext) (bool, string) {
+	anlogger.Debugf(lc, "common_action.go : mark photoId [%s] as deleted for userId [%s]", photoId, userId)
+	input :=
+		&dynamodb.UpdateItemInput{
+			ExpressionAttributeNames: map[string]*string{
+				"#deletedAt": aws.String(commons.PhotoDeletedAtColumnName),
+			},
+			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+				":deletedAtV": {
+					S: aws.String(time.Now().UTC().Format("2006-01-02-15-04-05.000")),
+				},
+			},
+			Key: map[string]*dynamodb.AttributeValue{
+				commons.UserIdColumnName: {
+					S: aws.String(userId),
+				},
+				commons.PhotoIdColumnName: {
+					S: aws.String(photoId),
+				},
+			},
+			TableName:        aws.String(tableName),
+			UpdateExpression: aws.String("SET #deletedAt = :deletedAtV"),
+		}
+	_, err := awsDbClient.UpdateItem(input)
+	if err != nil {
+		anlogger.Errorf(lc, "common_action.go : error while delete photoId [%s] for userId [%s] : %v", photoId, userId, err)
+		return false, commons.InternalServerError
+	}
+	anlogger.Debugf(lc, "common_action.go : successfully delete photoId [%s] for userId [%s]", photoId, userId)
+	return true, ""
+}

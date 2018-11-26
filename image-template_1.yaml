@@ -324,6 +324,7 @@ Resources:
       Policies:
         - AmazonKinesisFullAccess
         - AmazonDynamoDBFullAccess
+        - AmazonSQSFullAccess
       Events:
         CommonEventStreamEvent:
           Type: Kinesis
