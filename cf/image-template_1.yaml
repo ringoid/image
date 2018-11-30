@@ -153,7 +153,7 @@ Resources:
     Properties:
       FunctionName: !FindInMap [FunctionName, WarmUpFunction, !Ref Env]
       Handler: warm_up
-      CodeUri: ./warmup-image.zip
+      CodeUri: ../warmup-image.zip
       Description: WarmUp image function
       Policies:
         - AWSLambdaFullAccess
@@ -163,7 +163,7 @@ Resources:
     Properties:
       FunctionName: !FindInMap [FunctionName, InternalCleanDbImageFunction, !Ref Env]
       Handler: clean
-      CodeUri: ./clean.zip
+      CodeUri: ../clean.zip
       Description: Clean DB image function
       Policies:
         - AWSLambdaFullAccess
@@ -201,7 +201,7 @@ Resources:
     Properties:
       FunctionName: !FindInMap [FunctionName, GetPreSignedUrlFunction, !Ref Env]
       Handler: get_presigned_url
-      CodeUri: ./getpresigned-image.zip
+      CodeUri: ../getpresigned-image.zip
       Description: Get Pre-Signed url image function
       Policies:
         - AmazonDynamoDBFullAccess
@@ -224,7 +224,7 @@ Resources:
     Properties:
       FunctionName: !FindInMap [FunctionName, InternalHandleUploadFunction, !Ref Env]
       Handler: internal_handle_upload
-      CodeUri: ./internal_handle_upload.zip
+      CodeUri: ../internal_handle_upload.zip
       Description: Handle uploaded images
       Policies:
         - AmazonDynamoDBFullAccess
@@ -244,7 +244,7 @@ Resources:
     Properties:
       FunctionName: !FindInMap [FunctionName, GetOwnPhotosFunction, !Ref Env]
       Handler: get_own_photos
-      CodeUri: ./get_own_photos.zip
+      CodeUri: ../get_own_photos.zip
       Description: Get all user's photos
       Policies:
         - AmazonDynamoDBFullAccess
@@ -261,7 +261,7 @@ Resources:
     Properties:
       FunctionName: !FindInMap [FunctionName, DeletePhotoFunction, !Ref Env]
       Handler: delete_photo
-      CodeUri: ./delete_photo.zip
+      CodeUri: ../delete_photo.zip
       Description: Delete user's photo
       Policies:
         - AmazonDynamoDBFullAccess
@@ -298,7 +298,7 @@ Resources:
     Properties:
       FunctionName: !FindInMap [FunctionName, InternalHandleAsyncTaskFunction, !Ref Env]
       Handler: internal_handle_task
-      CodeUri: ./internal_handle_task.zip
+      CodeUri: ../internal_handle_task.zip
       Description: Handle async task from the queue
       Policies:
         - AmazonDynamoDBFullAccess
@@ -319,7 +319,7 @@ Resources:
     Properties:
       FunctionName: !Join [ "-", [ !Ref Env, internal-stream-consumer-image] ]
       Handler: handle_stream
-      CodeUri: ./handle_stream.zip
+      CodeUri: ../handle_stream.zip
       Description: Consumer for Kinesis stream
       Policies:
         - AmazonKinesisFullAccess
@@ -340,7 +340,7 @@ Resources:
     Properties:
       FunctionName: !FindInMap [FunctionName, InternalGetImagesFunction, !Ref Env]
       Handler: get_images
-      CodeUri: ./get_images.zip
+      CodeUri: ../get_images.zip
       Description: Internal Get Images function
       Policies:
         - AmazonDynamoDBFullAccess

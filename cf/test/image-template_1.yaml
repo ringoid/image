@@ -1,0 +1,359 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Image Service Stack
+
+
+Mappings:
+
+  LogMap:
+    PapertrailLog:
+      stage: "logs7.papertrailapp.com:23213"
+      test: "logs7.papertrailapp.com:16637"
+      prod: "logs7.papertrailapp.com:16747"
+
+  FunctionName:
+    GetPreSignedUrlFunction:
+      test: test-get-presigned-url-image
+      stage: stage-get-presigned-url-image
+      prod: prod-get-presigned-url-image
+    InternalHandleUploadFunction:
+      test: test-internal-handle-upload-image
+      stage: stage-internal-handle-upload-image
+      prod: prod-internal-handle-upload-image
+    GetOwnPhotosFunction:
+      test: test-get-own-photos-image
+      stage: stage-get-own-photos-image
+      prod: prod-get-own-photos-image
+    DeletePhotoFunction:
+      test: test-delete-photo-image
+      stage: stage-delete-photo-image
+      prod: prod-delete-photo-image
+    InternalHandleAsyncTaskFunction:
+      test: test-internal-handle-async-task-image
+      stage: stage-internal-handle-async-task-image
+      prod: prod-internal-handle-async-task-image
+    WarmUpFunction:
+      test: test-warm-up-image
+      stage: stage-warm-up-image
+      prod: prod-warm-up-image
+    InternalPresignFunction:
+      test: test-internal-presign-url-image
+      stage: stage-internal-presign-url-image
+      prod: prod-internal-presign-url-image
+    InternalGetImagesFunction:
+      test: test-internal-get-images-image
+      stage: stage-internal-get-images-image
+      prod: prod-internal-get-images-image
+    InternalCleanDbImageFunction:
+      test: test-internal-clean-db-image
+      stage: stage-internal-clean-db-image
+      prod: prod-internal-clean-db-image
+
+
+Parameters:
+  Env:
+    Type: String
+    Default: stage
+    AllowedValues:
+      - test
+      - stage
+      - prod
+    Description: Env name
+  BaseOriginPhotoBucketName:
+    Type: String
+    Default: ringoid-origin-photo
+  BasePublicPhotoBucketName:
+    Type: String
+    Default: ringoid-public-photo
+
+
+Globals:
+    Function:
+        Timeout: 300
+        MemorySize: 512
+        Runtime: go1.x
+        Environment:
+          Variables:
+            ENV: !Ref Env
+            PAPERTRAIL_LOG_ADDRESS: !FindInMap [LogMap, PapertrailLog, !Ref Env]
+            DELIVERY_STREAM:
+              Fn::ImportValue:
+                !Join [ "-", [ !Ref Env, DeliveryStreamExportName] ]
+            INTERNAL_AUTH_FUNCTION_NAME:
+              Fn::ImportValue:
+                !Join [ "-", [ !Ref Env, InternalGetUserIdFunctionExport] ]
+            PRESIGN_FUNCTION_NAME: !FindInMap [FunctionName, InternalPresignFunction, !Ref Env]
+            ORIGIN_PHOTO_BUCKET_NAME: !Join [ "-", [ !Ref Env, !Ref BaseOriginPhotoBucketName] ]
+            PHOTO_USER_MAPPING_TABLE: !Ref PhotoUserMappingTable
+            USER_PHOTO_TABLE: !Ref UserPhotoTable
+            PUBLIC_PHOTO_BUCKET_NAME: !Join [ "-", [ !Ref Env, !Ref BasePublicPhotoBucketName] ]
+            ASYNC_TASK_SQS_QUEUE: !Ref AsyncTaskSqsQueue
+            COMMON_STREAM:
+              Fn::ImportValue:
+                !Join [ "-", [ !Ref Env, CommonEventStreamExportName] ]
+            INTERNAL_STREAM_NAME:
+              Fn::ImportValue:
+                !Join [ "-", [ !Ref Env, InternalEventStreamExportName] ]
+            NEED_WARM_UP_LAMBDA_NAMES: !Join [ ",", [ !FindInMap [FunctionName, GetPreSignedUrlFunction, !Ref Env], !FindInMap [FunctionName, GetOwnPhotosFunction, !Ref Env], !FindInMap [FunctionName, DeletePhotoFunction, !Ref Env], !FindInMap [FunctionName, InternalPresignFunction, !Ref Env], !FindInMap [FunctionName, InternalGetImagesFunction, !Ref Env]  ] ]
+        Tags:
+          Company: Ringoid
+          Service: image
+          Environment: !Ref Env
+
+Resources:
+
+  WarmUpFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !FindInMap [FunctionName, WarmUpFunction, !Ref Env]
+      Handler: warm_up
+      CodeUri: ../../warmup-image.zip
+      Description: WarmUp image function
+      Policies:
+        - AWSLambdaFullAccess
+
+  InternalCleanDbImageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !FindInMap [FunctionName, InternalCleanDbImageFunction, !Ref Env]
+      Handler: clean
+      CodeUri: ../../clean.zip
+      Description: Clean DB image function
+      Policies:
+        - AWSLambdaFullAccess
+        - AmazonDynamoDBFullAccess
+
+  ScheduledWarmUpFunctionRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Scheduled WarmUp lambda function rule
+      ScheduleExpression: rate(8 minutes)
+      State: ENABLED
+      Name: !Join [ "-", [ !Ref Env, warm_up_image_function_rule] ]
+      Targets:
+        -
+          Arn:
+            Fn::GetAtt:
+              - WarmUpFunction
+              - Arn
+          Id: ScheduledWarmUpFunctionRuleId
+
+  PermissionForEventsToInvokeWarmUpFunction:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref WarmUpFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+          - ScheduledWarmUpFunctionRule
+          - Arn
+
+
+  GetPreSignedUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !FindInMap [FunctionName, GetPreSignedUrlFunction, !Ref Env]
+      Handler: get_presigned_url
+      CodeUri: ../../getpresigned-image.zip
+      Description: Get Pre-Signed url image function
+      Policies:
+        - AmazonDynamoDBFullAccess
+        - AWSLambdaFullAccess
+        - AmazonKinesisFirehoseFullAccess
+      Events:
+        StartEvent:
+          Type: Api
+          Properties:
+            Path: /get_presigned
+            Method: post
+
+  OriginPhotoBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join [ "-", [ !Ref Env, !Ref BaseOriginPhotoBucketName] ]
+
+  InternalHandleUploadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !FindInMap [FunctionName, InternalHandleUploadFunction, !Ref Env]
+      Handler: internal_handle_upload
+      CodeUri: ../../internal_handle_upload.zip
+      Description: Handle uploaded images
+      Policies:
+        - AmazonDynamoDBFullAccess
+        - AWSLambdaFullAccess
+        - AmazonKinesisFirehoseFullAccess
+        - AmazonS3FullAccess
+        - AmazonKinesisFullAccess
+
+  PublicPhotoBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: PublicRead
+      BucketName: !Join [ "-", [ !Ref Env, !Ref BasePublicPhotoBucketName] ]
+
+  GetOwnPhotosFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !FindInMap [FunctionName, GetOwnPhotosFunction, !Ref Env]
+      Handler: get_own_photos
+      CodeUri: ../../get_own_photos.zip
+      Description: Get all user's photos
+      Policies:
+        - AmazonDynamoDBFullAccess
+        - AWSLambdaFullAccess
+      Events:
+        StartEvent:
+          Type: Api
+          Properties:
+            Path: /get_own_photos
+            Method: get
+
+  DeletePhotoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !FindInMap [FunctionName, DeletePhotoFunction, !Ref Env]
+      Handler: delete_photo
+      CodeUri: ../../delete_photo.zip
+      Description: Delete user's photo
+      Policies:
+        - AmazonDynamoDBFullAccess
+        - AWSLambdaFullAccess
+        - AmazonKinesisFirehoseFullAccess
+        - AmazonSQSFullAccess
+      Events:
+        StartEvent:
+          Type: Api
+          Properties:
+            Path: /delete_photo
+            Method: post
+
+  AsyncTaskSqsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Join [ "-", [ !Ref Env, image, async-task-queue] ]
+      VisibilityTimeout: 300
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+            - AsyncTaskDeadMessageSqsQueue
+            - Arn
+        maxReceiveCount: 3
+
+  AsyncTaskDeadMessageSqsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Join [ "-", [ !Ref Env, image, async-task-dead-messages-queue] ]
+      VisibilityTimeout: 300
+
+  InternalHandleAsyncTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !FindInMap [FunctionName, InternalHandleAsyncTaskFunction, !Ref Env]
+      Handler: internal_handle_task
+      CodeUri: ../../internal_handle_task.zip
+      Description: Handle async task from the queue
+      Policies:
+        - AmazonDynamoDBFullAccess
+        - AmazonSQSFullAccess
+        - AmazonS3FullAccess
+      Events:
+        StartEvent:
+          Type: SQS
+          Properties:
+            Queue:
+              Fn::GetAtt:
+                - AsyncTaskSqsQueue
+                - Arn
+            BatchSize: 10
+
+  KinesisConsumerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Join [ "-", [ !Ref Env, internal-stream-consumer-image] ]
+      Handler: handle_stream
+      CodeUri: ../../handle_stream.zip
+      Description: Consumer for Kinesis stream
+      Policies:
+        - AmazonKinesisFullAccess
+        - AmazonDynamoDBFullAccess
+        - AmazonSQSFullAccess
+      Events:
+        CommonEventStreamEvent:
+          Type: Kinesis
+          Properties:
+            Stream:
+              Fn::ImportValue:
+                !Join [ "-", [ !Ref Env, InternalEventStreamExport] ]
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 1
+
+  InternalGetImagesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !FindInMap [FunctionName, InternalGetImagesFunction, !Ref Env]
+      Handler: get_images
+      CodeUri: ../../get_images.zip
+      Description: Internal Get Images function
+      Policies:
+        - AmazonDynamoDBFullAccess
+
+  PhotoUserMappingTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+          TableName: !Join [ "-", [ !Ref Env, Image, PhotoUserMappingTable] ]
+          BillingMode: PAY_PER_REQUEST
+          AttributeDefinitions:
+            -
+              AttributeName: photo_id
+              AttributeType: S
+          KeySchema:
+            -
+              AttributeName: photo_id
+              KeyType: HASH
+          Tags:
+            - Key: Company
+              Value: Ringoid
+            - Key: Service
+              Value: image
+            - Key: Environment
+              Value: !Ref Env
+
+  UserPhotoTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+          TableName: !Join [ "-", [ !Ref Env, Image, UserPhotoTable] ]
+          BillingMode: PAY_PER_REQUEST
+          AttributeDefinitions:
+            -
+              AttributeName: user_id
+              AttributeType: S
+            -
+              AttributeName: photo_id
+              AttributeType: S
+
+          KeySchema:
+            -
+              AttributeName: user_id
+              KeyType: HASH
+            -
+              AttributeName: photo_id
+              KeyType: RANGE
+          Tags:
+            - Key: Company
+              Value: Ringoid
+            - Key: Service
+              Value: image
+            - Key: Environment
+              Value: !Ref Env
+
+Outputs:
+  InternalGetImagesFunctionExport:
+    Value: !FindInMap [FunctionName, InternalGetImagesFunction, !Ref Env]
+    Export:
+      Name: !Join [ "-", [ !Ref Env, InternalGetImagesFunctionExport] ]
+  InternalCleanDbImageFunctionExport:
+    Value: !FindInMap [FunctionName, InternalCleanDbImageFunction, !Ref Env]
+    Export:
+      Name: !Join [ "-", [ !Ref Env, InternalCleanDbImageFunctionExport] ]

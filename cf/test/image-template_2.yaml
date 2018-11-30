@@ -11,52 +11,6 @@ Mappings:
       test: "logs7.papertrailapp.com:16637"
       prod: "logs7.papertrailapp.com:16747"
 
-  UserPhotoTableCUMap:
-    test:
-      wcumax: 1
-      wcucrt: 1
-      wcumin: 1
-      rcumax: 1
-      rcucrt: 1
-      rcumin: 1
-    stage:
-      wcumax: 1
-      wcucrt: 1
-      wcumin: 1
-      rcumax: 1
-      rcucrt: 1
-      rcumin: 1
-    prod:
-      wcumax: should-be-prod-value
-      wcucrt: should-be-prod-value
-      wcumin: should-be-prod-value
-      rcumax: should-be-prod-value
-      rcucrt: should-be-prod-value
-      rcumin: should-be-prod-value
-
-  PhotoUserMappingTableCUMap:
-    test:
-      wcumax: 1
-      wcucrt: 1
-      wcumin: 1
-      rcumax: 1
-      rcucrt: 1
-      rcumin: 1
-    stage:
-      wcumax: 1
-      wcucrt: 1
-      wcumin: 1
-      rcumax: 1
-      rcucrt: 1
-      rcumin: 1
-    prod:
-      wcumax: should-be-prod-value
-      wcucrt: should-be-prod-value
-      wcumin: should-be-prod-value
-      rcumax: should-be-prod-value
-      rcucrt: should-be-prod-value
-      rcumin: should-be-prod-value
-
   FunctionName:
     GetPreSignedUrlFunction:
       test: test-get-presigned-url-image
@@ -153,7 +107,7 @@ Resources:
     Properties:
       FunctionName: !FindInMap [FunctionName, WarmUpFunction, !Ref Env]
       Handler: warm_up
-      CodeUri: ./warmup-image.zip
+      CodeUri: ../../warmup-image.zip
       Description: WarmUp image function
       Policies:
         - AWSLambdaFullAccess
@@ -163,7 +117,7 @@ Resources:
     Properties:
       FunctionName: !FindInMap [FunctionName, InternalCleanDbImageFunction, !Ref Env]
       Handler: clean
-      CodeUri: ./clean.zip
+      CodeUri: ../../clean.zip
       Description: Clean DB image function
       Policies:
         - AWSLambdaFullAccess
@@ -201,7 +155,7 @@ Resources:
     Properties:
       FunctionName: !FindInMap [FunctionName, GetPreSignedUrlFunction, !Ref Env]
       Handler: get_presigned_url
-      CodeUri: ./getpresigned-image.zip
+      CodeUri: ../../getpresigned-image.zip
       Description: Get Pre-Signed url image function
       Policies:
         - AmazonDynamoDBFullAccess
@@ -224,7 +178,7 @@ Resources:
     Properties:
       FunctionName: !FindInMap [FunctionName, InternalHandleUploadFunction, !Ref Env]
       Handler: internal_handle_upload
-      CodeUri: ./internal_handle_upload.zip
+      CodeUri: ../../internal_handle_upload.zip
       Description: Handle uploaded images
       Policies:
         - AmazonDynamoDBFullAccess
@@ -256,7 +210,7 @@ Resources:
     Properties:
       FunctionName: !FindInMap [FunctionName, GetOwnPhotosFunction, !Ref Env]
       Handler: get_own_photos
-      CodeUri: ./get_own_photos.zip
+      CodeUri: ../../get_own_photos.zip
       Description: Get all user's photos
       Policies:
         - AmazonDynamoDBFullAccess
@@ -273,7 +227,7 @@ Resources:
     Properties:
       FunctionName: !FindInMap [FunctionName, DeletePhotoFunction, !Ref Env]
       Handler: delete_photo
-      CodeUri: ./delete_photo.zip
+      CodeUri: ../../delete_photo.zip
       Description: Delete user's photo
       Policies:
         - AmazonDynamoDBFullAccess
@@ -310,7 +264,7 @@ Resources:
     Properties:
       FunctionName: !FindInMap [FunctionName, InternalHandleAsyncTaskFunction, !Ref Env]
       Handler: internal_handle_task
-      CodeUri: ./internal_handle_task.zip
+      CodeUri: ../../internal_handle_task.zip
       Description: Handle async task from the queue
       Policies:
         - AmazonDynamoDBFullAccess
@@ -331,7 +285,7 @@ Resources:
     Properties:
       FunctionName: !Join [ "-", [ !Ref Env, internal-stream-consumer-image] ]
       Handler: handle_stream
-      CodeUri: ./handle_stream.zip
+      CodeUri: ../../handle_stream.zip
       Description: Consumer for Kinesis stream
       Policies:
         - AmazonKinesisFullAccess
@@ -352,7 +306,7 @@ Resources:
     Properties:
       FunctionName: !FindInMap [FunctionName, InternalGetImagesFunction, !Ref Env]
       Handler: get_images
-      CodeUri: ./get_images.zip
+      CodeUri: ../../get_images.zip
       Description: Internal Get Images function
       Policies:
         - AmazonDynamoDBFullAccess
@@ -361,6 +315,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
           TableName: !Join [ "-", [ !Ref Env, Image, PhotoUserMappingTable] ]
+          BillingMode: PAY_PER_REQUEST
           AttributeDefinitions:
             -
               AttributeName: photo_id
@@ -369,11 +324,6 @@ Resources:
             -
               AttributeName: photo_id
               KeyType: HASH
-
-          ProvisionedThroughput:
-            ReadCapacityUnits: !FindInMap [PhotoUserMappingTableCUMap, !Ref Env, rcucrt]
-            WriteCapacityUnits: !FindInMap [PhotoUserMappingTableCUMap, !Ref Env, wcucrt]
-
           Tags:
             - Key: Company
               Value: Ringoid
@@ -382,72 +332,11 @@ Resources:
             - Key: Environment
               Value: !Ref Env
 
-  PhotoUserMappingTableWriteCapacityScalableTarget:
-    Type: AWS::ApplicationAutoScaling::ScalableTarget
-    DependsOn: PhotoUserMappingTable
-    Properties:
-      MaxCapacity: !FindInMap [PhotoUserMappingTableCUMap, !Ref Env, wcumax]
-      MinCapacity: !FindInMap [PhotoUserMappingTableCUMap, !Ref Env, wcumin]
-      ResourceId: !Join
-        - /
-        - - table
-          - !Join [ "-", [ !Ref Env, Image, PhotoUserMappingTable] ]
-      RoleARN: !GetAtt
-        - ScalingRole
-        - Arn
-      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
-      ServiceNamespace: dynamodb
-
-  PhotoUserMappingTableReadCapacityScalableTarget:
-    Type: AWS::ApplicationAutoScaling::ScalableTarget
-    DependsOn: PhotoUserMappingTable
-    Properties:
-      MaxCapacity: !FindInMap [PhotoUserMappingTableCUMap, !Ref Env, rcumax]
-      MinCapacity: !FindInMap [PhotoUserMappingTableCUMap, !Ref Env, rcumin]
-      ResourceId: !Join
-        - /
-        - - table
-          - !Join [ "-", [ !Ref Env, Image, PhotoUserMappingTable] ]
-      RoleARN: !GetAtt
-        - ScalingRole
-        - Arn
-      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
-      ServiceNamespace: dynamodb
-
-  PhotoUserMappingTableWriteScalingPolicy:
-    Type: AWS::ApplicationAutoScaling::ScalingPolicy
-    DependsOn: PhotoUserMappingTable
-    Properties:
-      PolicyName: WriteAutoScalingPolicy
-      PolicyType: TargetTrackingScaling
-      ScalingTargetId:
-        Ref: PhotoUserMappingTableWriteCapacityScalableTarget
-      TargetTrackingScalingPolicyConfiguration:
-        TargetValue: 70
-        ScaleInCooldown: 60
-        ScaleOutCooldown: 60
-        PredefinedMetricSpecification:
-          PredefinedMetricType: DynamoDBWriteCapacityUtilization
-
-  PhotoUserMappingTableReadScalingPolicy:
-    Type: AWS::ApplicationAutoScaling::ScalingPolicy
-    DependsOn: PhotoUserMappingTable
-    Properties:
-      PolicyName: ReadAutoScalingPolicy
-      PolicyType: TargetTrackingScaling
-      ScalingTargetId:
-        Ref: PhotoUserMappingTableReadCapacityScalableTarget
-      TargetTrackingScalingPolicyConfiguration:
-        TargetValue: 70
-        ScaleInCooldown: 60
-        ScaleOutCooldown: 60
-        PredefinedMetricSpecification:
-          PredefinedMetricType: DynamoDBReadCapacityUtilization
-
   UserPhotoTable:
     Type: AWS::DynamoDB::Table
     Properties:
           TableName: !Join [ "-", [ !Ref Env, Image, UserPhotoTable] ]
+          BillingMode: PAY_PER_REQUEST
           AttributeDefinitions:
             -
               AttributeName: user_id
@@ -463,11 +352,6 @@ Resources:
             -
               AttributeName: photo_id
               KeyType: RANGE
-
-          ProvisionedThroughput:
-            ReadCapacityUnits: !FindInMap [UserPhotoTableCUMap, !Ref Env, rcucrt]
-            WriteCapacityUnits: !FindInMap [UserPhotoTableCUMap, !Ref Env, wcucrt]
-
           Tags:
             - Key: Company
               Value: Ringoid
@@ -475,101 +359,6 @@ Resources:
               Value: image
             - Key: Environment
               Value: !Ref Env
-
-  UserPhotoTableWriteCapacityScalableTarget:
-    Type: AWS::ApplicationAutoScaling::ScalableTarget
-    DependsOn: UserPhotoTable
-    Properties:
-      MaxCapacity: !FindInMap [UserPhotoTableCUMap, !Ref Env, wcumax]
-      MinCapacity: !FindInMap [UserPhotoTableCUMap, !Ref Env, wcumin]
-      ResourceId: !Join
-        - /
-        - - table
-          - !Join [ "-", [ !Ref Env, Image, UserPhotoTable] ]
-      RoleARN: !GetAtt
-        - ScalingRole
-        - Arn
-      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
-      ServiceNamespace: dynamodb
-
-  UserPhotoTableReadCapacityScalableTarget:
-    Type: AWS::ApplicationAutoScaling::ScalableTarget
-    DependsOn: UserPhotoTable
-    Properties:
-      MaxCapacity: !FindInMap [UserPhotoTableCUMap, !Ref Env, rcumax]
-      MinCapacity: !FindInMap [UserPhotoTableCUMap, !Ref Env, rcumin]
-      ResourceId: !Join
-        - /
-        - - table
-          - !Join [ "-", [ !Ref Env, Image, UserPhotoTable] ]
-      RoleARN: !GetAtt
-        - ScalingRole
-        - Arn
-      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
-      ServiceNamespace: dynamodb
-
-  UserPhotoTableWriteScalingPolicy:
-    Type: AWS::ApplicationAutoScaling::ScalingPolicy
-    DependsOn: UserPhotoTable
-    Properties:
-      PolicyName: WriteAutoScalingPolicy
-      PolicyType: TargetTrackingScaling
-      ScalingTargetId:
-        Ref: UserPhotoTableWriteCapacityScalableTarget
-      TargetTrackingScalingPolicyConfiguration:
-        TargetValue: 70
-        ScaleInCooldown: 60
-        ScaleOutCooldown: 60
-        PredefinedMetricSpecification:
-          PredefinedMetricType: DynamoDBWriteCapacityUtilization
-
-  UserPhotoTableReadScalingPolicy:
-    Type: AWS::ApplicationAutoScaling::ScalingPolicy
-    DependsOn: UserPhotoTable
-    Properties:
-      PolicyName: ReadAutoScalingPolicy
-      PolicyType: TargetTrackingScaling
-      ScalingTargetId:
-        Ref: UserPhotoTableReadCapacityScalableTarget
-      TargetTrackingScalingPolicyConfiguration:
-        TargetValue: 70
-        ScaleInCooldown: 60
-        ScaleOutCooldown: 60
-        PredefinedMetricSpecification:
-          PredefinedMetricType: DynamoDBReadCapacityUtilization
-
-
-  ScalingRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          -
-            Effect: Allow
-            Principal:
-              Service:
-                - "application-autoscaling.amazonaws.com"
-            Action:
-              - "sts:AssumeRole"
-      Path: "/"
-      Policies:
-        -
-          PolicyName: root
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              -
-                Effect: Allow
-                Action:
-                  - "dynamodb:DescribeTable"
-                  - "dynamodb:UpdateTable"
-                  - "cloudwatch:PutMetricAlarm"
-                  - "cloudwatch:DescribeAlarms"
-                  - "cloudwatch:GetMetricStatistics"
-                  - "cloudwatch:SetAlarmState"
-                  - "cloudwatch:DeleteAlarms"
-                Resource: "*"
 
 Outputs:
   InternalGetImagesFunctionExport:
