@@ -36,8 +36,8 @@ func deleteAllPhotos(body []byte, userPhotoTable, asyncTaskQueue string, awsSqsC
 		if !ok {
 			return errors.New(errStr)
 		}
-		if aEvent.UserWasReported && commons.IsItOriginPhoto(val) {
-			anlogger.Infof(lc, "delete_user.go : user with userId [%s] was reported, so skip delete his origin photo [%s] from s3",
+		if (aEvent.UserReportStatus == commons.UserWasReportedStatus || aEvent.UserReportStatus == commons.UserWasReportInitiatorStatus) && commons.IsItOriginPhoto(val) {
+			anlogger.Infof(lc, "delete_user.go : user with userId [%s] was reported or was report initiator, so skip delete his origin photo [%s] from s3",
 				aEvent.UserId, val)
 			continue
 		}
