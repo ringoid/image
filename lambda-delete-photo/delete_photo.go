@@ -159,7 +159,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	userId, ok, wasReported, errStr := commons.CallVerifyAccessToken(appVersion, isItAndroid, reqParam.AccessToken, internalAuthFunctionName, clientLambda, anlogger, lc)
+	userId, ok, userTakePartInReport, errStr := commons.CallVerifyAccessToken(appVersion, isItAndroid, reqParam.AccessToken, internalAuthFunctionName, clientLambda, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "delete_photo.go : return %s to client", errStr)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
@@ -173,7 +173,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 			return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 		}
 
-		if val == originPhotoId && wasReported {
+		if val == originPhotoId && userTakePartInReport {
 			anlogger.Warnf(lc, "delete_photo.go :  userId [%s] was reported, so kipp origin photo with photoId [%s] in S3", userId, val)
 			continue
 		}
@@ -193,7 +193,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	event := commons.NewUserDeletePhotoEvent(userId, originPhotoId)
+	event := commons.NewUserDeletePhotoEvent(userId, originPhotoId, userTakePartInReport)
 	commons.SendAnalyticEvent(event, userId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
 
 	partitionKey := userId
