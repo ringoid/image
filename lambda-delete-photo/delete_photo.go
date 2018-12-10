@@ -65,21 +65,18 @@ func init() {
 	internalAuthFunctionName, ok = os.LookupEnv("INTERNAL_AUTH_FUNCTION_NAME")
 	if !ok {
 		anlogger.Fatalf(nil, "lambda-initialization : delete_photo.go : env can not be empty INTERNAL_AUTH_FUNCTION_NAME")
-		os.Exit(1)
 	}
 	anlogger.Debugf(nil, "lambda-initialization : delete_photo.go : start with INTERNAL_AUTH_FUNCTION_NAME = [%s]", internalAuthFunctionName)
 
 	presignFunctionName, ok = os.LookupEnv("PRESIGN_FUNCTION_NAME")
 	if !ok {
-		fmt.Printf("lambda-initialization : delete_photo.go : env can not be empty PRESIGN_FUNCTION_NAME")
-		os.Exit(1)
+		anlogger.Fatalf(nil, "lambda-initialization : delete_photo.go : env can not be empty PRESIGN_FUNCTION_NAME")
 	}
 	anlogger.Debugf(nil, "lambda-initialization : delete_photo.go : start with PRESIGN_FUNCTION_NAME = [%s]", presignFunctionName)
 
 	photoUserMappingTableName, ok = os.LookupEnv("PHOTO_USER_MAPPING_TABLE")
 	if !ok {
-		fmt.Printf("lambda-initialization : delete_photo.go : env can not be empty PHOTO_USER_MAPPING_TABLE")
-		os.Exit(1)
+		anlogger.Fatalf(nil, "lambda-initialization : delete_photo.go : env can not be empty PHOTO_USER_MAPPING_TABLE")
 	}
 	anlogger.Debugf(nil, "lambda-initialization : delete_photo.go : start with PHOTO_USER_MAPPING_TABLE = [%s]", photoUserMappingTableName)
 
@@ -118,7 +115,6 @@ func init() {
 	deliveryStreamName, ok = os.LookupEnv("DELIVERY_STREAM")
 	if !ok {
 		anlogger.Fatalf(nil, "lambda-initialization : delete_photo.go : env can not be empty DELIVERY_STREAM")
-		os.Exit(1)
 	}
 	anlogger.Debugf(nil, "lambda-initialization : delete_photo.go : start with DELIVERY_STREAM = [%s]", deliveryStreamName)
 
@@ -142,6 +138,8 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	lc, _ := lambdacontext.FromContext(ctx)
 
 	anlogger.Debugf(lc, "delete_photo.go : start handle request %v", request)
+
+	sourceIp := request.RequestContext.Identity.SourceIP
 
 	if commons.IsItWarmUpRequest(request.Body, anlogger, lc) {
 		return events.APIGatewayProxyResponse{}, nil
@@ -193,7 +191,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	event := commons.NewUserDeletePhotoEvent(userId, originPhotoId, userTakePartInReport)
+	event := commons.NewUserDeletePhotoEvent(userId, originPhotoId, sourceIp, userTakePartInReport)
 	commons.SendAnalyticEvent(event, userId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
 
 	partitionKey := userId
@@ -211,7 +209,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: commons.InternalServerError}, nil
 	}
 	anlogger.Debugf(lc, "delete_photo.go : return successful resp [%s] for userId [%s]", string(body), userId)
-	anlogger.Infof(lc, "delete_photo.go : successfully delete all photo based on photoId [%s] for userId [%s]", reqParam.PhotoId, userId)
+	anlogger.Infof(lc, "delete_photo.go : successfully delete photo with photoId [%s] for userId [%s]", reqParam.PhotoId, userId)
 	return events.APIGatewayProxyResponse{StatusCode: 200, Body: string(body)}, nil
 }
 
@@ -225,7 +223,7 @@ func getAllPhotoIdsBasedOnSource(sourceId, userId string, lc *lambdacontext.Lamb
 	for key, _ := range commons.AllowedPhotoResolution {
 		allIds = append(allIds, key+"_"+baseId)
 	}
-	anlogger.Debugf(lc, "delete_photo.go : successfully cretae del photo id list based on photoId [%s] for userId [%s], del list=%v", sourceId, userId, allIds)
+	anlogger.Debugf(lc, "delete_photo.go : successfully create del photo id list based on photoId [%s] for userId [%s], del list=%v", sourceId, userId, allIds)
 	return allIds, originPhotoId
 }
 

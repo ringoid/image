@@ -67,29 +67,25 @@ func init() {
 
 	presignFunctionName, ok = os.LookupEnv("PRESIGN_FUNCTION_NAME")
 	if !ok {
-		fmt.Printf("lambda-initialization : get_own_photos.go : env can not be empty PRESIGN_FUNCTION_NAME")
-		os.Exit(1)
+		anlogger.Fatalf(nil, "lambda-initialization : get_own_photos.go : env can not be empty PRESIGN_FUNCTION_NAME")
 	}
 	anlogger.Debugf(nil, "lambda-initialization : get_own_photos.go : start with PRESIGN_FUNCTION_NAME = [%s]", presignFunctionName)
 
 	photoUserMappingTableName, ok = os.LookupEnv("PHOTO_USER_MAPPING_TABLE")
 	if !ok {
-		fmt.Printf("lambda-initialization : get_own_photos.go : env can not be empty PHOTO_USER_MAPPING_TABLE")
-		os.Exit(1)
+		anlogger.Fatalf(nil, "lambda-initialization : get_own_photos.go : env can not be empty PHOTO_USER_MAPPING_TABLE")
 	}
 	anlogger.Debugf(nil, "lambda-initialization : get_own_photos.go : start with PHOTO_USER_MAPPING_TABLE = [%s]", photoUserMappingTableName)
 
 	originPhotoBucketName, ok = os.LookupEnv("ORIGIN_PHOTO_BUCKET_NAME")
 	if !ok {
-		fmt.Printf("lambda-initialization : get_own_photos.go : env can not be empty ORIGIN_PHOTO_BUCKET_NAME")
-		os.Exit(1)
+		anlogger.Fatalf(nil, "lambda-initialization : get_own_photos.go : env can not be empty ORIGIN_PHOTO_BUCKET_NAME")
 	}
 	anlogger.Debugf(nil, "lambda-initialization : get_own_photos.go : start with ORIGIN_PHOTO_BUCKET_NAME = [%s]", originPhotoBucketName)
 
 	userPhotoTable, ok = os.LookupEnv("USER_PHOTO_TABLE")
 	if !ok {
-		fmt.Printf("lambda-initialization : get_own_photos.go : env can not be empty USER_PHOTO_TABLE")
-		os.Exit(1)
+		anlogger.Fatalf(nil, "lambda-initialization : get_own_photos.go : env can not be empty USER_PHOTO_TABLE")
 	}
 	anlogger.Debugf(nil, "lambda-initialization : get_own_photos.go : start with USER_PHOTO_TABLE = [%s]", userPhotoTable)
 
@@ -110,7 +106,6 @@ func init() {
 	deliveryStreamName, ok = os.LookupEnv("DELIVERY_STREAM")
 	if !ok {
 		anlogger.Fatalf(nil, "lambda-initialization : get_own_photos.go : env can not be empty DELIVERY_STREAM")
-		os.Exit(1)
 	}
 	anlogger.Debugf(nil, "lambda-initialization : get_own_photos.go : start with DELIVERY_STREAM = [%s]", deliveryStreamName)
 
@@ -122,6 +117,8 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	lc, _ := lambdacontext.FromContext(ctx)
 
 	anlogger.Debugf(lc, "get_own_photos.go : start handle request %v", request)
+
+	sourceIp := request.RequestContext.Identity.SourceIP
 
 	if commons.IsItWarmUpRequest(request.Body, anlogger, lc) {
 		return events.APIGatewayProxyResponse{}, nil
@@ -151,13 +148,13 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 
 	photos, ok, errStr := getOwnPhotos(userId, resolution, lc)
 	if !ok {
-		anlogger.Errorf(lc, "get_own_photos.go : return %s to client", errStr)
+		anlogger.Errorf(lc, "get_own_photos.go : userId [%s], return %s to client", userId, errStr)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
 	metaMap, ok, errStr := getMetaInfs(userId, lc)
 	if !ok {
-		anlogger.Errorf(lc, "get_own_photos.go : return %s to client", errStr)
+		anlogger.Errorf(lc, "get_own_photos.go : userId [%s], return %s to client", userId, errStr)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
@@ -176,6 +173,9 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	}
 	resp.Photos = ownPhotos
 
+	event := commons.NewGetOwnPhotosEvent(userId, sourceIp, len(resp.Photos))
+	commons.SendAnalyticEvent(event, userId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
+
 	body, err := json.Marshal(resp)
 	if err != nil {
 		anlogger.Errorf(lc, "get_own_photos.go : error while marshaling resp [%v] object for userId [%s] : %v", resp, userId, err)
@@ -183,6 +183,8 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: commons.InternalServerError}, nil
 	}
 	anlogger.Debugf(lc, "get_own_photos.go : return successful resp [%s] for userId [%s]", string(body), userId)
+
+	anlogger.Infof(lc, "get_own_photos.go : return [%d] own photos to the user with userId [%s]", len(resp.Photos), userId)
 	return events.APIGatewayProxyResponse{StatusCode: 200, Body: string(body)}, nil
 }
 

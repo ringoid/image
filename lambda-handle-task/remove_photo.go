@@ -23,8 +23,6 @@ func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *commons
 		return errors.New(errStr)
 	}
 
-	//todo: we need to check if your was reported and don't delete origin photo
-
 	ok, errStr = commons.DeleteFromS3(userPhoto.Bucket, userPhoto.Key, rTask.UserId, awsS3Client, lc, anlogger)
 	if !ok {
 		return errors.New(errStr)
@@ -84,30 +82,4 @@ func getUserPhoto(userId, photoId, tableName string, lc *lambdacontext.LambdaCon
 		res, userId, photoId, tableName)
 
 	return &res, true, ""
-}
-
-//return ok and error string
-func deletePhotoFromDynamo(userId, photoId, tableName string, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) (bool, string) {
-	anlogger.Debugf(lc, "remove_photo.go : delete photo using userId [%s] and photoId [%s] from tableName [%s]", userId, photoId, tableName)
-	input := &dynamodb.DeleteItemInput{
-		Key: map[string]*dynamodb.AttributeValue{
-			commons.UserIdColumnName: {
-				S: aws.String(userId),
-			},
-			commons.PhotoIdColumnName: {
-				S: aws.String(photoId),
-			},
-		},
-		TableName: aws.String(tableName),
-	}
-	_, err := awsDbClient.DeleteItem(input)
-	if err != nil {
-		anlogger.Errorf(lc, "remove_photo.go : error delete photo using userId [%s] and photoId [%s] from tableName [%s] : %v",
-			userId, photoId, tableName, err)
-		return false, fmt.Sprintf("error delete photo using userId [%s] and photoId [%s] from tableName [%s] : %v",
-			userId, photoId, tableName, err)
-	}
-	anlogger.Debugf(lc, "remove_photo.go : successfully delete photo userId [%s] and photoId [%s] from tableName [%s]",
-		userId, photoId, tableName)
-	return true, ""
 }

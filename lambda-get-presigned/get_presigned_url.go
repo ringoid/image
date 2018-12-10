@@ -100,7 +100,6 @@ func init() {
 	deliveryStreamName, ok = os.LookupEnv("DELIVERY_STREAM")
 	if !ok {
 		anlogger.Fatalf(nil, "lambda-initialization : get_presigned_url.go : env can not be empty DELIVERY_STREAM")
-		os.Exit(1)
 	}
 	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : start with DELIVERY_STREAM = [%s]", deliveryStreamName)
 
@@ -112,6 +111,8 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	lc, _ := lambdacontext.FromContext(ctx)
 
 	anlogger.Debugf(lc, "get_presigned_url.go : start handle request %v", request)
+
+	sourceIp := request.RequestContext.Identity.SourceIP
 
 	if commons.IsItWarmUpRequest(request.Body, anlogger, lc) {
 		return events.APIGatewayProxyResponse{}, nil
@@ -159,7 +160,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	event := commons.NewUserAskUploadLinkEvent(originPhotoBucketName, s3Key, userId)
+	event := commons.NewUserAskUploadLinkEvent(originPhotoBucketName, s3Key, userId, sourceIp)
 	commons.SendAnalyticEvent(event, userId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
 
 	resp := apimodel.GetPresignUrlResp{
@@ -173,7 +174,8 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		anlogger.Errorf(lc, "get_presigned_url.go : userId [%s], return %s to client", userId, commons.InternalServerError)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: commons.InternalServerError}, nil
 	}
-	anlogger.Debugf(lc, "get_presigned_url.go : return successful resp [%s] for userId [%s]", string(body), userId)
+
+	anlogger.Infof(lc, "get_presigned_url.go : return presign url for userId [%s]", userId)
 	return events.APIGatewayProxyResponse{StatusCode: 200, Body: string(body)}, nil
 }
 

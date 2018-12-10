@@ -104,9 +104,9 @@ func MarkPhotoAsDel(userId, photoId, tableName string, awsDbClient *dynamodb.Dyn
 		}
 	_, err := awsDbClient.UpdateItem(input)
 	if err != nil {
-		anlogger.Errorf(lc, "common_action.go : error while delete photoId [%s] for userId [%s] : %v", photoId, userId, err)
+		anlogger.Errorf(lc, "common_action.go : error while mark photo as deleted photoId [%s] for userId [%s] : %v", photoId, userId, err)
 		return false, commons.InternalServerError
 	}
-	anlogger.Debugf(lc, "common_action.go : successfully delete photoId [%s] for userId [%s]", photoId, userId)
+	anlogger.Debugf(lc, "common_action.go : successfully mark photoId [%s] as deleted for userId [%s]", photoId, userId)
 	return true, ""
 }

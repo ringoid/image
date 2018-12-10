@@ -76,10 +76,9 @@ func init() {
 func handler(ctx context.Context, event events.SQSEvent) (error) {
 	lc, _ := lambdacontext.FromContext(ctx)
 
-	anlogger.Debugf(lc, "internal_handle_task.go : start handle request %v", event)
+	anlogger.Debugf(lc, "internal_handle_task.go : start handle request with [%d] records", len(event.Records))
 
 	for _, record := range event.Records {
-		anlogger.Debugf(lc, "internal_handle_task.go : handle record %v", record)
 		body := record.Body
 		var aTask apimodel.AsyncTask
 		err := json.Unmarshal([]byte(body), &aTask)
@@ -87,6 +86,8 @@ func handler(ctx context.Context, event events.SQSEvent) (error) {
 			anlogger.Errorf(lc, "internal_handle_task.go : error unmarshal body [%s] to AsyncTask : %v", body, err)
 			return errors.New(fmt.Sprintf("error unmarshal body %s : %v", body, err))
 		}
+		anlogger.Debugf(lc, "internal_handle_task.go : handle record %v", aTask)
+
 		switch aTask.TaskType {
 		case apimodel.ImageRemovePhotoTaskType:
 			err = removePhoto([]byte(body), lc, anlogger)
@@ -108,7 +109,7 @@ func handler(ctx context.Context, event events.SQSEvent) (error) {
 		}
 	}
 
-	anlogger.Debugf(lc, "internal_handle_task.go : successfully complete task %v", event)
+	anlogger.Debugf(lc, "internal_handle_task.go : successfully complete handle request with [%d] records", len(event.Records))
 	return nil
 }
 

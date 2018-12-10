@@ -49,8 +49,7 @@ func init() {
 
 	userPhotoTable, ok = os.LookupEnv("USER_PHOTO_TABLE")
 	if !ok {
-		fmt.Printf("lambda-initialization : get_images.go : env can not be empty USER_PHOTO_TABLE")
-		os.Exit(1)
+		anlogger.Fatalf(nil, "lambda-initialization : get_images.go : env can not be empty USER_PHOTO_TABLE")
 	}
 	anlogger.Debugf(nil, "lambda-initialization : get_images.go : start with USER_PHOTO_TABLE = [%s]", userPhotoTable)
 
@@ -135,45 +134,51 @@ func photos(userIdPhotos []map[string]string, respChan chan<- map[string]string,
 		ConsistentRead: aws.Bool(true),
 		Keys:           keys,
 	}
+
+	resultMap := make(map[string]string)
+
 	requestItems := make(map[string]*dynamodb.KeysAndAttributes)
 	requestItems[userPhotoTable] = keysAndAttributes
 
-	input := &dynamodb.BatchGetItemInput{
-		RequestItems: requestItems,
-	}
-
-	result, err := awsDbClient.BatchGetItem(input)
-	if err != nil {
-		anlogger.Errorf(lc, "get_images.go : error while making batch request to fetch photos : %v", err)
-		respChan <- make(map[string]string)
-		return
-	}
-
-	if len(result.UnprocessedKeys) != 0 {
-		//todo: later we can handle this case and retry operation
-		anlogger.Warnf(lc, "get_images.go : error while making batch request to fetch photos, there are UnprocessedKeys %v", result.UnprocessedKeys)
-	}
-
-	resultMap := make(map[string]string)
-	for _, attributeList := range result.Responses {
-		for _, eachAttr := range attributeList {
-			targetUserId := *eachAttr[commons.UserIdColumnName].S
-			targetPhotoId := *eachAttr[commons.PhotoIdColumnName].S
-			_, wasPhotoDeleted := eachAttr[commons.PhotoDeletedAtColumnName]
-			_, wasHidden := eachAttr[commons.PhotoHiddenAtColumnName]
-			if wasPhotoDeleted || wasHidden {
-				anlogger.Debugf(lc, "get_images.go : photo with userId [%s] and photoId [%s] is deleted or hidden, so exclude it from response", targetUserId, targetPhotoId)
-				continue
-			}
-			targetPhotoUriAttr, ok := eachAttr[commons.PhotoSourceUriColumnName]
-			if !ok {
-				anlogger.Debugf(lc, "get_images.go : photo with userId [%s] and photoId [%s] don't have uri, so exclude it from response", targetUserId, targetPhotoId)
-				continue
-			}
-			resultMap[targetUserId+"_"+targetPhotoId] = *targetPhotoUriAttr.S
+	for {
+		input := &dynamodb.BatchGetItemInput{
+			RequestItems: requestItems,
 		}
+
+		result, err := awsDbClient.BatchGetItem(input)
+		if err != nil {
+			anlogger.Errorf(lc, "get_images.go : error while making batch request to fetch photos : %v", err)
+			respChan <- make(map[string]string)
+			return
+		}
+
+		for _, attributeList := range result.Responses {
+			for _, eachAttr := range attributeList {
+				targetUserId := *eachAttr[commons.UserIdColumnName].S
+				targetPhotoId := *eachAttr[commons.PhotoIdColumnName].S
+				_, wasPhotoDeleted := eachAttr[commons.PhotoDeletedAtColumnName]
+				_, wasHidden := eachAttr[commons.PhotoHiddenAtColumnName]
+				if wasPhotoDeleted || wasHidden {
+					anlogger.Debugf(lc, "get_images.go : photo with userId [%s] and photoId [%s] is deleted or hidden, so exclude it from response", targetUserId, targetPhotoId)
+					continue
+				}
+				targetPhotoUriAttr, ok := eachAttr[commons.PhotoSourceUriColumnName]
+				if !ok {
+					anlogger.Debugf(lc, "get_images.go : photo with userId [%s] and photoId [%s] don't have uri, so exclude it from response", targetUserId, targetPhotoId)
+					continue
+				}
+				resultMap[targetUserId+"_"+targetPhotoId] = *targetPhotoUriAttr.S
+			}
+		}
+
+		if len(result.UnprocessedKeys) == 0 {
+			break
+		}
+
+		requestItems = result.UnprocessedKeys
 	}
-	anlogger.Debugf(lc, "get_images.go : successfully fetch photos [%d] with batch request", len(resultMap))
+
+	anlogger.Debugf(lc, "get_images.go : successfully fetch [%d] photos with batch request", len(resultMap))
 	respChan <- resultMap
 }
 

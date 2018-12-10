@@ -81,10 +81,9 @@ func init() {
 func handler(ctx context.Context, event events.KinesisEvent) (error) {
 	lc, _ := lambdacontext.FromContext(ctx)
 
-	anlogger.Debugf(lc, "handle_stream.go : start handle request %v", event)
+	anlogger.Debugf(lc, "handle_stream.go : start handle request with [%d] records", len(event.Records))
 
 	for _, record := range event.Records {
-		anlogger.Debugf(lc, "handle_stream.go : handle record %v", record)
 		body := record.Kinesis.Data
 
 		var aEvent commons.BaseInternalEvent
@@ -93,6 +92,8 @@ func handler(ctx context.Context, event events.KinesisEvent) (error) {
 			anlogger.Errorf(lc, "handle_stream.go : error unmarshal body [%s] to BaseInternalEvent : %v", body, err)
 			return errors.New(fmt.Sprintf("error unmarshal body %s : %v", body, err))
 		}
+		anlogger.Debugf(lc, "handle_stream.go : handle record %v", aEvent)
+
 		switch aEvent.EventType {
 		case commons.LikePhotoInternalEvent:
 			err = likePhoto(body, userPhotoTable, awsDbClient, lc, anlogger)
@@ -107,7 +108,7 @@ func handler(ctx context.Context, event events.KinesisEvent) (error) {
 		}
 	}
 
-	anlogger.Debugf(lc, "handle_stream.go : successfully complete task %v", event)
+	anlogger.Debugf(lc, "handle_stream.go : successfully complete handle request with [%d] records", len(event.Records))
 	return nil
 }
 
