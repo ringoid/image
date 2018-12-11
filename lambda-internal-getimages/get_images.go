@@ -147,7 +147,7 @@ func photos(userIdPhotos []map[string]string, respChan chan<- map[string]string,
 		result, err := awsDbClient.BatchGetItem(input)
 		if err != nil {
 			anlogger.Errorf(lc, "get_images.go : error while making batch request to fetch photos : %v", err)
-			respChan <- make(map[string]string)
+			respChan <- resultMap
 			return
 		}
 
