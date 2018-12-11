@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	basicLambda "github.com/aws/aws-lambda-go/lambda"
-	"../apimodel"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/aws"
 	"os"
@@ -66,13 +65,13 @@ func init() {
 
 }
 
-func handler(ctx context.Context, request apimodel.GetNewFacesResp) (apimodel.FacesWithUrlResp, error) {
+func handler(ctx context.Context, request commons.ProfilesResp) (commons.FacesWithUrlResp, error) {
 	lc, _ := lambdacontext.FromContext(ctx)
 
 	anlogger.Debugf(lc, "get_images.go : start handle request, isItWarmUpRequest [%v],  profiles %v", request.WarmUpRequest, request.Profiles)
 
 	if request.WarmUpRequest {
-		return apimodel.FacesWithUrlResp{}, nil
+		return commons.FacesWithUrlResp{}, nil
 	}
 
 	respChan := make(chan map[string]string)
@@ -105,7 +104,7 @@ func handler(ctx context.Context, request apimodel.GetNewFacesResp) (apimodel.Fa
 		}
 	}
 
-	resp := apimodel.FacesWithUrlResp{
+	resp := commons.FacesWithUrlResp{
 		UserIdPhotoIdKeyUrlMap: finalMap,
 	}
 
