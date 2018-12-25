@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Dax Image Service Stack
+
+Mappings:
+
+  DaxName:
+    ImageDaxCluster:
+      test: test-dax-image
+      stage: stage-dax-image
+      prod: prod-dax-image
+
+  DaxNodeType:
+    ImageDaxCluster:
+      test: dax.t2.small
+      stage: dax.t2.small
+      prod: dax.t2.small
+
+Parameters:
+  Env:
+    Type: String
+    Default: stage
+    AllowedValues:
+      - test
+      - stage
+      - prod
+    Description: Env name
+
+  DefaultVpc:
+    Type: String
+    Default: vpc-e5537783
+    Description: Default VPC ID
+
+Resources:
+
+  ImageDaxCluster:
+    Type: AWS::DAX::Cluster
+    Properties:
+      Description: DAX cluster for Image service
+      ClusterName: !FindInMap [DaxName, ImageDaxCluster, !Ref Env]
+      NodeType: !FindInMap [DaxNodeType, ImageDaxCluster, !Ref Env]
+      ReplicationFactor: 1
+      ParameterGroupName: !Ref DaxParamGroup
+      IAMRoleARN: !GetAtt DaxRole.Arn
+      SubnetGroupName: !Ref DaxSubnet
+      SecurityGroupIds:
+        - !GetAtt DaxSecurityGroup.GroupId
+
+  DaxRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+            - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+              - dax.amazonaws.com
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+      RoleName: dax-role
+
+  DaxSubnet:
+    Type: AWS::DAX::SubnetGroup
+    DependsOn: DaxSecurityGroup
+    Properties:
+      SubnetGroupName: !Join [ "-", [ !Ref Env, DaxSubnet] ]
+      Description: Dax Subnet Group for Image service
+      SubnetIds:
+        - subnet-500f9936
+        - subnet-6f8e5d35
+        - subnet-737d1c3b
+
+  DaxSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for Dax cluster usage
+      GroupName: !Join [ "-", [ !Ref Env, DaxClusterSG] ]
+      VpcId: !Ref DefaultVpc
+
+  DAXSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn: DaxSecurityGroup
+    Properties:
+      GroupId: !GetAtt DaxSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 8111
+      ToPort: 8111
+      SourceSecurityGroupId: !GetAtt DaxSecurityGroup.GroupId
+
+  DaxParamGroup:
+    Type: AWS::DAX::ParameterGroup
+    Properties:
+      ParameterGroupName: !Join [ "-", [ !Ref Env, DaxClusterImageGroup] ]
+      ParameterNameValues:
+         "query-ttl-millis" : "100"
+         "record-ttl-millis" : "86400000"
+
+Outputs:
+  DaxClusterExport:
+    Value: !GetAtt ImageDaxCluster.ClusterDiscoveryEndpoint
+    Export:
+      Name: !Join [ "-", [ !Ref Env, DaxClusterExport] ]
+  DaxSecurityGroupIdExport:
+    Value: !GetAtt DaxSecurityGroup.GroupId
+    Export:
+      Name: !Join [ "-", [ !Ref Env, DaxSecurityGroupIdExport] ]

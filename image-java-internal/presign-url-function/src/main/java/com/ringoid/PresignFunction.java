@@ -12,8 +12,8 @@ import java.net.URISyntaxException;
 import java.net.URL;
 
 public class PresignFunction {
-    private final Logger log = LoggerFactory.getLogger(getClass());
     private static final String REGION = "eu-west-1";
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     public Response handle(Request request) {
         log.info("handle request : {}", request);

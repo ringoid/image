@@ -4,7 +4,6 @@ import (
 	"context"
 	basicLambda "github.com/aws/aws-lambda-go/lambda"
 	"../apimodel"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/firehose"
 	"os"
@@ -15,13 +14,13 @@ import (
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"sort"
-	"strings"
-	"strconv"
 	"github.com/ringoid/commons"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
+	"github.com/aws/aws-dax-go/dax"
 )
 
 var anlogger *commons.Logger
-var awsDbClient *dynamodb.DynamoDB
+var daxClient dynamodbiface.DynamoDBAPI
 var awsDeliveryStreamClient *firehose.Firehose
 var deliveryStreamName string
 var internalAuthFunctionName string
@@ -97,8 +96,18 @@ func init() {
 	}
 	anlogger.Debugf(nil, "lambda-initialization : get_own_photos.go : aws session was successfully initialized")
 
-	awsDbClient = dynamodb.New(awsSession)
-	anlogger.Debugf(nil, "lambda-initialization : get_own_photos.go : dynamodb client was successfully initialized")
+	daxEndpoint, ok := os.LookupEnv("DAX_ENDPOINT")
+	if !ok {
+		anlogger.Fatalf(nil, "lambda-initialization : get_own_photos.go : env can not be empty DAX_ENDPOINT")
+	}
+	cfg := dax.DefaultConfig()
+	cfg.HostPorts = []string{daxEndpoint}
+	cfg.Region = commons.Region
+	daxClient, err = dax.New(cfg)
+	if err != nil {
+		anlogger.Fatalf(nil, "lambda-initialization : get_own_photos.go : error initialize DAX cluster")
+	}
+	anlogger.Debugf(nil, "lambda-initialization : get_own_photos.go : dax client was successfully initialized")
 
 	clientLambda = lambda.New(awsSession)
 	anlogger.Debugf(nil, "lambda-initialization : get_own_photos.go : lambda client was successfully initialized")
@@ -146,13 +155,13 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	photos, ok, errStr := getOwnPhotos(userId, resolution, lc)
+	photos, ok, errStr := apimodel.GetOwnPhotosQuery(userId, resolution, userPhotoTable, daxClient, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "get_own_photos.go : userId [%s], return %s to client", userId, errStr)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	metaMap, ok, errStr := getMetaInfs(userId, lc)
+	metaMap, ok, errStr := apimodel.GetMetaInfsQuery(userId, userPhotoTable, daxClient, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "get_own_photos.go : userId [%s], return %s to client", userId, errStr)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
@@ -206,113 +215,6 @@ func sortOwnPhotos(source []*apimodel.UserPhoto) []*apimodel.UserPhoto {
 		return source[i].Likes > source[j].Likes
 	})
 	return source
-}
-
-//return own photos, ok and error string
-//todo:keep in mind that we should use ExclusiveStartKey later, if somebody will have > 100K photos
-func getOwnPhotos(userId, resolution string, lc *lambdacontext.LambdaContext) ([]*apimodel.UserPhoto, bool, string) {
-	anlogger.Debugf(lc, "get_own_photos.go : get all own photos for userId [%s] with resolution [%s]", userId, resolution)
-	input := &dynamodb.QueryInput{
-		ExpressionAttributeNames: map[string]*string{
-			"#userId":  aws.String(commons.UserIdColumnName),
-			"#photoId": aws.String(commons.PhotoIdColumnName),
-		},
-		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-			":userIdV": {
-				S: aws.String(userId),
-			},
-			":photoIdV": {
-				S: aws.String(resolution),
-			},
-		},
-		FilterExpression:       aws.String(fmt.Sprintf("attribute_not_exists(%s)", commons.PhotoDeletedAtColumnName)),
-		ConsistentRead:         aws.Bool(true),
-		KeyConditionExpression: aws.String("#userId = :userIdV AND begins_with(#photoId, :photoIdV)"),
-		TableName:              aws.String(userPhotoTable),
-	}
-	result, err := awsDbClient.Query(input)
-	if err != nil {
-		anlogger.Errorf(lc, "get_own_photos.go : error while query all own photos userId [%s] with resolution [%s] : %v", userId, resolution, err)
-		return make([]*apimodel.UserPhoto, 0), false, commons.InternalServerError
-	}
-
-	if *result.Count == 0 {
-		anlogger.Debugf(lc, "get_own_photos.go : there is no photo for userId [%s] with resolution [%s]", userId, resolution)
-		return make([]*apimodel.UserPhoto, 0), true, ""
-	}
-
-	items := make([]*apimodel.UserPhoto, 0)
-	for _, v := range result.Items {
-		originPhotoId := strings.Replace(*v[commons.PhotoIdColumnName].S, resolution, "origin", 1)
-		items = append(items, &apimodel.UserPhoto{
-			UserId:         *v[commons.UserIdColumnName].S,
-			PhotoId:        *v[commons.PhotoIdColumnName].S,
-			PhotoSourceUri: *v[commons.PhotoSourceUriColumnName].S,
-			PhotoType:      *v[commons.PhotoTypeColumnName].S,
-			Bucket:         *v[commons.PhotoBucketColumnName].S,
-			Key:            *v[commons.PhotoKeyColumnName].S,
-			UpdatedAt:      *v[commons.UpdatedTimeColumnName].S,
-			OriginPhotoId:  originPhotoId,
-		})
-	}
-	anlogger.Debugf(lc, "get_own_photos.go : successfully fetch [%v] photos for userId [%s] and resolution [%s], result=%v",
-		*result.Count, userId, resolution, items)
-	return items, true, ""
-}
-
-//return photo's meta infs, ok and error string
-//todo:keep in mind that we should use ExclusiveStartKey later, if somebody will have > 100K photos
-func getMetaInfs(userId string, lc *lambdacontext.LambdaContext) (map[string]*apimodel.UserPhotoMetaInf, bool, string) {
-	anlogger.Debugf(lc, "get_own_photos.go : get all photo's meta infs for userId [%s]", userId)
-	metaInfPartitionKey := userId + commons.PhotoPrimaryKeyMetaPostfix
-	input := &dynamodb.QueryInput{
-		ExpressionAttributeNames: map[string]*string{
-			"#userId": aws.String(commons.UserIdColumnName),
-		},
-		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-			":userIdV": {
-				S: aws.String(metaInfPartitionKey),
-			},
-		},
-		FilterExpression:       aws.String(fmt.Sprintf("attribute_not_exists(%s)", commons.PhotoDeletedAtColumnName)),
-		ConsistentRead:         aws.Bool(true),
-		KeyConditionExpression: aws.String("#userId = :userIdV"),
-		TableName:              aws.String(userPhotoTable),
-	}
-	result, err := awsDbClient.Query(input)
-	if err != nil {
-		anlogger.Errorf(lc, "get_own_photos.go : error while query all photo's meta infs for userId [%s] : %v", userId, err)
-		return make(map[string]*apimodel.UserPhotoMetaInf, 0), false, commons.InternalServerError
-	}
-
-	if *result.Count == 0 {
-		anlogger.Debugf(lc, "get_own_photos.go : there is no photo's meta info for userId [%s]", userId)
-		return make(map[string]*apimodel.UserPhotoMetaInf, 0), true, ""
-	}
-
-	anlogger.Debugf(lc, "get_own_photos.go : there is [%d] photo's meta info for userId [%s]", *result.Count, userId)
-
-	items := make(map[string]*apimodel.UserPhotoMetaInf, 0)
-	for _, v := range result.Items {
-		photoId := *v[commons.PhotoIdColumnName].S
-
-		likes, err := strconv.Atoi(*v[commons.PhotoLikesColumnName].N)
-		if err != nil {
-			anlogger.Errorf(lc, "get_own_photos.go : error while convert likes from photo meta inf to int, photoId [%s] for userId [%s] : %v", photoId, userId, err)
-			return make(map[string]*apimodel.UserPhotoMetaInf, 0), false, commons.InternalServerError
-		}
-
-		items[photoId] = &apimodel.UserPhotoMetaInf{
-			UserId:        *v[commons.UserIdColumnName].S,
-			OriginPhotoId: photoId,
-			Likes:         likes,
-		}
-	}
-
-	anlogger.Debugf(lc, "get_own_photos.go : successfully fetch [%v] photo meta inf for userId [%s], result=%v",
-		*result.Count, userId, items)
-
-	return items, true, ""
 }
 
 func main() {

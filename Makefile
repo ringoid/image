@@ -57,6 +57,10 @@ zip_lambda: build
 
 test-deploy: test-deploy-internal zip_lambda
 	@echo '--- Build lambda test ---'
+	@echo 'Package template Dax'
+	sam package --template-file cf/dax-template.yaml --s3-bucket ringoid-cloudformation-template --output-template-file dax-template-packaged.yaml
+	@echo 'Deploy template Dax'
+	sam deploy --template-file dax-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name test-dax-image-stack --capabilities CAPABILITY_NAMED_IAM --parameter-overrides Env=test --no-fail-on-empty-changeset
 	@echo 'Package template 1 phase'
 	sam package --template-file cf/image-template_1.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
 	@echo 'Deploy test-image-stack 1 phase'
@@ -72,6 +76,8 @@ test-deploy: test-deploy-internal zip_lambda
 
 stage-deploy: stage-deploy-internal zip_lambda
 	@echo '--- Build lambda stage ---'
+	@echo 'Deploy template Dax'
+	sam deploy --template-file cf/dax-template.yaml --s3-bucket ringoid-cloudformation-template --stack-name stage-dax-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=stage --no-fail-on-empty-changeset
 	@echo 'Package template 1 phase'
 	sam package --template-file cf/image-template_1.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
 	@echo 'Deploy stage-image-stack 1 phase'
@@ -87,6 +93,8 @@ stage-deploy: stage-deploy-internal zip_lambda
 
 prod-deploy: prod-deploy-internal zip_lambda
 	@echo '--- Build lambda prod ---'
+	@echo 'Deploy template Dax'
+	sam deploy --template-file cf/dax-template.yaml --s3-bucket ringoid-cloudformation-template --stack-name prod-dax-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=prod --no-fail-on-empty-changeset
 	@echo 'Package template 1 phase'
 	sam package --template-file cf/image-template_1.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
 	@echo 'Deploy prod-image-stack 1 phase'

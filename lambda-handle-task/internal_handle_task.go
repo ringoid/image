@@ -4,7 +4,6 @@ import (
 	"context"
 	basicLambda "github.com/aws/aws-lambda-go/lambda"
 	"../apimodel"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/aws"
 	"os"
 	"fmt"
@@ -16,10 +15,12 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/ringoid/commons"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
+	"github.com/aws/aws-dax-go/dax"
 )
 
 var anlogger *commons.Logger
-var awsDbClient *dynamodb.DynamoDB
+var daxClient dynamodbiface.DynamoDBAPI
 var awsS3Client *s3.S3
 var downloader *s3manager.Downloader
 var uploader *s3manager.Uploader
@@ -60,8 +61,18 @@ func init() {
 	}
 	anlogger.Debugf(nil, "lambda-initialization : internal_handle_task.go : aws session was successfully initialized")
 
-	awsDbClient = dynamodb.New(awsSession)
-	anlogger.Debugf(nil, "lambda-initialization : internal_handle_task.go : dynamodb client was successfully initialized")
+	daxEndpoint, ok := os.LookupEnv("DAX_ENDPOINT")
+	if !ok {
+		anlogger.Fatalf(nil, "lambda-initialization : internal_handle_task.go : env can not be empty DAX_ENDPOINT")
+	}
+	cfg := dax.DefaultConfig()
+	cfg.HostPorts = []string{daxEndpoint}
+	cfg.Region = commons.Region
+	daxClient, err = dax.New(cfg)
+	if err != nil {
+		anlogger.Fatalf(nil, "lambda-initialization : internal_handle_task.go : error initialize DAX cluster")
+	}
+	anlogger.Debugf(nil, "lambda-initialization : internal_handle_task.go : dax client was successfully initialized")
 
 	awsS3Client = s3.New(awsSession)
 	anlogger.Debugf(nil, "lambda-initialization : internal_handle_task.go : s3 client was successfully initialized")
@@ -90,12 +101,12 @@ func handler(ctx context.Context, event events.SQSEvent) (error) {
 
 		switch aTask.TaskType {
 		case apimodel.ImageRemovePhotoTaskType:
-			err = removePhoto([]byte(body), lc, anlogger)
+			err = removePhoto([]byte(body), daxClient, lc, anlogger)
 			if err != nil {
 				return err
 			}
 		case apimodel.ImageResizePhotoTaskType:
-			err = resizePhoto([]byte(body), downloader, uploader, awsDbClient, lc, anlogger)
+			err = resizePhoto([]byte(body), downloader, uploader, daxClient, lc, anlogger)
 			if err != nil {
 				return err
 			}

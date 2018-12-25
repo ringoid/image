@@ -4,21 +4,20 @@ import (
 	"fmt"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"../apimodel"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/aws"
 	"encoding/json"
 	"errors"
 	"github.com/ringoid/commons"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 )
 
-func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) error {
+func removePhoto(body []byte, daxClient dynamodbiface.DynamoDBAPI, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) error {
 	var rTask apimodel.RemovePhotoAsyncTask
 	err := json.Unmarshal([]byte(body), &rTask)
 	if err != nil {
 		anlogger.Errorf(lc, "remove_photo.go : error unmarshal body [%s] to ImageRemovePhotoTaskType: %v", body, err)
 		return errors.New(fmt.Sprintf("error unmarshal body %s : %v", body, err))
 	}
-	userPhoto, ok, errStr := getUserPhoto(rTask.UserId, rTask.PhotoId, rTask.TableName, lc, anlogger)
+	userPhoto, ok, errStr := apimodel.GetUserPhoto(rTask.UserId, rTask.PhotoId, rTask.TableName, daxClient, anlogger, lc)
 	if !ok {
 		return errors.New(errStr)
 	}
@@ -44,42 +43,4 @@ func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *commons
 	//}
 
 	return nil
-}
-
-//return userPhoto, ok and error string
-func getUserPhoto(userId, photoId, tableName string, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) (*apimodel.UserPhoto, bool, string) {
-	anlogger.Debugf(lc, "remove_photo.go : get userPhoto for userId [%s], photoId [%s] from table [%s]",
-		userId, photoId, tableName)
-	input := &dynamodb.GetItemInput{
-		Key: map[string]*dynamodb.AttributeValue{
-			commons.UserIdColumnName: {
-				S: aws.String(userId),
-			},
-			commons.PhotoIdColumnName: {
-				S: aws.String(photoId),
-			},
-		},
-		ConsistentRead: aws.Bool(true),
-		TableName:      aws.String(tableName),
-	}
-	result, err := awsDbClient.GetItem(input)
-	if err != nil {
-		anlogger.Errorf(lc, "remove_photo.go : error get item for userId [%s], photoId [%s] and table [%s] : %v",
-			userId, photoId, tableName, err)
-		return nil, false, commons.InternalServerError
-	}
-	if len(result.Item) == 0 {
-		anlogger.Warnf(lc, "remove_photo.go : there is no item for userId [%s], photoId [%s] and table [%s]",
-			userId, photoId, tableName)
-		return nil, true, ""
-	}
-
-	res := apimodel.UserPhoto{
-		Bucket: *result.Item[commons.PhotoBucketColumnName].S,
-		Key:    *result.Item[commons.PhotoKeyColumnName].S,
-	}
-	anlogger.Debugf(lc, "remove_photo.go : successfully get userPhoto %v for userId [%s], photoId [%s] and table [%s]",
-		res, userId, photoId, tableName)
-
-	return &res, true, ""
 }

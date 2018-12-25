@@ -4,7 +4,6 @@ import (
 	"context"
 	basicLambda "github.com/aws/aws-lambda-go/lambda"
 	"../apimodel"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/firehose"
 	"os"
@@ -12,17 +11,17 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"encoding/json"
 	"github.com/aws/aws-lambda-go/events"
-	"time"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"crypto/sha1"
 	"github.com/satori/go.uuid"
 	"github.com/ringoid/commons"
+	"github.com/aws/aws-dax-go/dax"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 )
 
 var anlogger *commons.Logger
-var awsDbClient *dynamodb.DynamoDB
+var daxClient dynamodbiface.DynamoDBAPI
 var awsDeliveryStreamClient *firehose.Firehose
 var deliveryStreamName string
 var internalAuthFunctionName string
@@ -91,8 +90,18 @@ func init() {
 	}
 	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : aws session was successfully initialized")
 
-	awsDbClient = dynamodb.New(awsSession)
-	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : dynamodb client was successfully initialized")
+	daxEndpoint, ok := os.LookupEnv("DAX_ENDPOINT")
+	if !ok {
+		anlogger.Fatalf(nil, "lambda-initialization : get_presigned_url.go : env can not be empty DAX_ENDPOINT")
+	}
+	cfg := dax.DefaultConfig()
+	cfg.HostPorts = []string{daxEndpoint}
+	cfg.Region = commons.Region
+	daxClient, err = dax.New(cfg)
+	if err != nil {
+		anlogger.Fatalf(nil, "lambda-initialization : get_presigned_url.go : error initialize DAX cluster")
+	}
+	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : dax client was successfully initialized")
 
 	clientLambda = lambda.New(awsSession)
 	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : lambda client was successfully initialized")
@@ -146,7 +155,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 			return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 		}
 		s3Key = photoId + "_photo." + reqParam.Extension
-		wasCreated, retry, errStr := createPhotoIdUserIdMapping(s3Key, userId, lc)
+		wasCreated, retry, errStr := apimodel.CreatePhotoIdUserIdMappingUpdate(s3Key, userId, photoUserMappingTableName, daxClient, anlogger, lc)
 		if !wasCreated && !needToRetry {
 			anlogger.Errorf(lc, "get_presigned_url.go : return %s to client", errStr)
 			return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
@@ -177,51 +186,6 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 
 	anlogger.Infof(lc, "get_presigned_url.go : return presign url for userId [%s]", userId)
 	return events.APIGatewayProxyResponse{StatusCode: 200, Body: string(body)}, nil
-}
-
-//return was mapping created, need to retry and error string
-func createPhotoIdUserIdMapping(photoId, userId string, lc *lambdacontext.LambdaContext) (bool, bool, string) {
-	anlogger.Debugf(lc, "get_presigned_url.go : create mapping between photoId [%s] and userId [%s]", photoId, userId)
-
-	input :=
-		&dynamodb.UpdateItemInput{
-			ExpressionAttributeNames: map[string]*string{
-				"#userId": aws.String(commons.UserIdColumnName),
-				"#time":   aws.String(commons.UpdatedTimeColumnName),
-			},
-			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-				":uV": {
-					S: aws.String(userId),
-				},
-				":tV": {
-					S: aws.String(time.Now().UTC().Format("2006-01-02-15-04-05.000")),
-				},
-			},
-			Key: map[string]*dynamodb.AttributeValue{
-				commons.PhotoIdColumnName: {
-					S: aws.String(photoId),
-				},
-			},
-			ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%v)", commons.PhotoIdColumnName)),
-
-			TableName:        aws.String(photoUserMappingTableName),
-			UpdateExpression: aws.String("SET #userId = :uV, #time = :tV"),
-		}
-
-	_, err := awsDbClient.UpdateItem(input)
-	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case dynamodb.ErrCodeConditionalCheckFailedException:
-				anlogger.Debugf(lc, "get_presigned_url.go : such photoId [%s] already in use, userId [%s]", photoId, userId)
-				return false, true, ""
-			}
-		}
-		anlogger.Errorf(lc, "get_presigned_url.go : error while create mapping between photoId [%s] and userId [%s] : %v", photoId, userId, err)
-		return false, false, commons.InternalServerError
-	}
-	anlogger.Debugf(lc, "get_presigned_url.go : successfully create mapping between photoId [%s] and userId [%s]", photoId, userId)
-	return true, false, ""
 }
 
 //return generated photoId, was everything ok and error string

@@ -7,13 +7,14 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"os"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/ringoid/commons"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
+	"github.com/aws/aws-dax-go/dax"
 )
 
 var anlogger *commons.Logger
-var awsDbClient *dynamodb.DynamoDB
+var daxClient dynamodbiface.DynamoDBAPI
 var userPhotoTable string
 
 const defaultBatchSize = 100 //100 is a max
@@ -23,7 +24,6 @@ func init() {
 	var ok bool
 	var papertrailAddress string
 	var err error
-	var awsSession *session.Session
 
 	env, ok = os.LookupEnv("ENV")
 	if !ok {
@@ -52,16 +52,18 @@ func init() {
 	}
 	anlogger.Debugf(nil, "lambda-initialization : get_images.go : start with USER_PHOTO_TABLE = [%s]", userPhotoTable)
 
-	awsSession, err = session.NewSession(aws.NewConfig().
-		WithRegion(commons.Region).WithMaxRetries(commons.MaxRetries).
-		WithLogger(aws.LoggerFunc(func(args ...interface{}) { anlogger.AwsLog(args) })).WithLogLevel(aws.LogOff))
-	if err != nil {
-		anlogger.Fatalf(nil, "lambda-initialization : get_images.go : error during initialization : %v", err)
+	daxEndpoint, ok := os.LookupEnv("DAX_ENDPOINT")
+	if !ok {
+		anlogger.Fatalf(nil, "lambda-initialization : get_images.go : env can not be empty DAX_ENDPOINT")
 	}
-	anlogger.Debugf(nil, "lambda-initialization : get_images.go : aws session was successfully initialized")
-
-	awsDbClient = dynamodb.New(awsSession)
-	anlogger.Debugf(nil, "lambda-initialization : get_images.go : dynamodb client was successfully initialized")
+	cfg := dax.DefaultConfig()
+	cfg.HostPorts = []string{daxEndpoint}
+	cfg.Region = commons.Region
+	daxClient, err = dax.New(cfg)
+	if err != nil {
+		anlogger.Fatalf(nil, "lambda-initialization : get_images.go : error initialize DAX cluster")
+	}
+	anlogger.Debugf(nil, "lambda-initialization : get_images.go : dax client was successfully initialized")
 
 }
 
@@ -85,14 +87,14 @@ func handler(ctx context.Context, request commons.ProfilesResp) (commons.FacesWi
 			eachMap[targetUserId] = targetPhotoId
 			userIdPhotos = append(userIdPhotos, eachMap)
 			if len(userIdPhotos) >= defaultBatchSize {
-				go photos(userIdPhotos, respChan, lc)
+				go photos(userIdPhotos, respChan, daxClient, lc)
 				batchCounter++
 				userIdPhotos = make([]map[string]string, 0)
 			}
 		}
 	}
 	if len(userIdPhotos) > 0 {
-		go photos(userIdPhotos, respChan, lc)
+		go photos(userIdPhotos, respChan, daxClient, lc)
 		batchCounter++
 	}
 
@@ -114,7 +116,7 @@ func handler(ctx context.Context, request commons.ProfilesResp) (commons.FacesWi
 
 //as an argument function receives list with maps where each key is userId and value is photoId
 //return map where each key is userId_photoId and value is photo url, ok and error string
-func photos(userIdPhotos []map[string]string, respChan chan<- map[string]string, lc *lambdacontext.LambdaContext) {
+func photos(userIdPhotos []map[string]string, respChan chan<- map[string]string, dbClient dynamodbiface.DynamoDBAPI, lc *lambdacontext.LambdaContext) {
 	anlogger.Debugf(lc, "get_images.go : make batch request to fetch photos, len is %d", len(userIdPhotos))
 	keys := make([]map[string]*dynamodb.AttributeValue, 0)
 	for _, paramMap := range userIdPhotos {
@@ -144,7 +146,7 @@ func photos(userIdPhotos []map[string]string, respChan chan<- map[string]string,
 			RequestItems: requestItems,
 		}
 
-		result, err := awsDbClient.BatchGetItem(input)
+		result, err := dbClient.BatchGetItem(input)
 		if err != nil {
 			anlogger.Errorf(lc, "get_images.go : error while making batch request to fetch photos : %v", err)
 			respChan <- resultMap

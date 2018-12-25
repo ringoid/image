@@ -6,14 +6,13 @@ import (
 	"fmt"
 	"encoding/json"
 	"errors"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/ringoid/commons"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 )
 
 func deleteAllPhotos(body []byte, userPhotoTable, asyncTaskQueue string, awsSqsClient *sqs.SQS,
-	awsDbClient *dynamodb.DynamoDB, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) error {
+	daxClient dynamodbiface.DynamoDBAPI, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) error {
 
 	anlogger.Debugf(lc, "delete_user.go : handle event and delete all photos, body %s", string(body))
 	var aEvent commons.UserCallDeleteHimselfEvent
@@ -25,14 +24,14 @@ func deleteAllPhotos(body []byte, userPhotoTable, asyncTaskQueue string, awsSqsC
 	userPhotoMetaPartitionKey := aEvent.UserId + commons.PhotoPrimaryKeyMetaPostfix
 
 	//first delete all photos
-	photoIds, err := allUserPhotoId(aEvent.UserId, userPhotoTable, awsDbClient, lc, anlogger)
+	photoIds, err := apimodel.AllUserPhotoIdQuery(aEvent.UserId, userPhotoTable, daxClient, anlogger, lc)
 	if err != nil {
 		return err
 	}
 
 	for _, eachPhotoIdP := range photoIds {
 		val := *eachPhotoIdP.S
-		ok, errStr := apimodel.MarkPhotoAsDel(aEvent.UserId, val, userPhotoTable, awsDbClient, anlogger, lc)
+		ok, errStr := apimodel.MarkPhotoAsDelUpdate(aEvent.UserId, val, userPhotoTable, daxClient, anlogger, lc)
 		if !ok {
 			return errors.New(errStr)
 		}
@@ -50,59 +49,18 @@ func deleteAllPhotos(body []byte, userPhotoTable, asyncTaskQueue string, awsSqsC
 	}
 
 	//now lets delete all meta inf
-	metaIds, err := allUserPhotoId(userPhotoMetaPartitionKey, userPhotoTable, awsDbClient, lc, anlogger)
+	metaIds, err := apimodel.AllUserPhotoIdQuery(userPhotoMetaPartitionKey, userPhotoTable, daxClient, anlogger, lc)
 	if err != nil {
 		return err
 	}
 
 	for _, eachPhotoIdP := range metaIds {
 		val := *eachPhotoIdP.S
-		ok, errStr := apimodel.MarkPhotoAsDel(userPhotoMetaPartitionKey, val, userPhotoTable, awsDbClient, anlogger, lc)
+		ok, errStr := apimodel.MarkPhotoAsDelUpdate(userPhotoMetaPartitionKey, val, userPhotoTable, daxClient, anlogger, lc)
 		if !ok {
 			return errors.New(errStr)
 		}
 	}
 	anlogger.Debugf(lc, "delete_user.go : successfully handle event and delete all photos, body %s", string(body))
 	return nil
-}
-
-func allUserPhotoId(partitionKey, userPhotoTable string, awsDbClient *dynamodb.DynamoDB, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) ([]*dynamodb.AttributeValue, error) {
-	var lastEvaluatedKey map[string]*dynamodb.AttributeValue
-
-	var finalResult []*dynamodb.AttributeValue
-
-	for {
-		input := &dynamodb.QueryInput{
-			ExpressionAttributeNames: map[string]*string{
-				"#userId": aws.String(commons.UserIdColumnName),
-			},
-			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-				":userIdV": {
-					S: aws.String(partitionKey),
-				},
-			},
-			ExclusiveStartKey:      lastEvaluatedKey,
-			ConsistentRead:         aws.Bool(true),
-			KeyConditionExpression: aws.String("#userId = :userIdV"),
-			FilterExpression:       aws.String(fmt.Sprintf("attribute_not_exists(%s)", commons.PhotoDeletedAtColumnName)),
-			TableName:              aws.String(userPhotoTable),
-		}
-
-		result, err := awsDbClient.Query(input)
-		if err != nil {
-			anlogger.Errorf(lc, "delete_user.go : error while query all photos for partitionKey [%s] : %v", partitionKey, err)
-			return finalResult, errors.New(fmt.Sprintf("error query all photos for partition key %s : %v", partitionKey, err))
-		}
-
-		lastEvaluatedKey = result.LastEvaluatedKey
-
-		for _, item := range result.Items {
-			finalResult = append(finalResult, item[commons.PhotoIdColumnName])
-		}
-
-		if len(lastEvaluatedKey) == 0 {
-			anlogger.Debugf(lc, "delete_user.go : all photo ids size is [%d] for partition key [%s]", len(finalResult), partitionKey)
-			return finalResult, nil
-		}
-	}
 }

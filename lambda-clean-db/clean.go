@@ -7,14 +7,15 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"os"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"errors"
 	"github.com/ringoid/commons"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
+	"github.com/aws/aws-dax-go/dax"
 )
 
 var anlogger *commons.Logger
-var awsDbClient *dynamodb.DynamoDB
+var awsDaxClient dynamodbiface.DynamoDBAPI
 var userPhotoTable string
 
 func init() {
@@ -22,7 +23,6 @@ func init() {
 	var ok bool
 	var papertrailAddress string
 	var err error
-	var awsSession *session.Session
 
 	env, ok = os.LookupEnv("ENV")
 	if !ok {
@@ -58,16 +58,18 @@ func init() {
 	}
 	anlogger.Debugf(nil, "lambda-initialization : clean.go : start with USER_PHOTO_TABLE = [%s]", userPhotoTable)
 
-	awsSession, err = session.NewSession(aws.NewConfig().
-		WithRegion(commons.Region).WithMaxRetries(commons.MaxRetries).
-		WithLogger(aws.LoggerFunc(func(args ...interface{}) { anlogger.AwsLog(args) })).WithLogLevel(aws.LogOff))
-	if err != nil {
-		anlogger.Fatalf(nil, "lambda-initialization : clean.go : error during initialization : %v", err)
+	daxEndpoint, ok := os.LookupEnv("DAX_ENDPOINT")
+	if !ok {
+		anlogger.Fatalf(nil, "lambda-initialization : clean.go : env can not be empty DAX_ENDPOINT")
 	}
-	anlogger.Debugf(nil, "lambda-initialization : clean.go : aws session was successfully initialized")
-
-	awsDbClient = dynamodb.New(awsSession)
-	anlogger.Debugf(nil, "lambda-initialization : clean.go : dynamodb client was successfully initialized")
+	cfg := dax.DefaultConfig()
+	cfg.HostPorts = []string{daxEndpoint}
+	cfg.Region = commons.Region
+	awsDaxClient, err = dax.New(cfg)
+	if err != nil {
+		anlogger.Fatalf(nil, "lambda-initialization : clean.go : error initialize DAX cluster")
+	}
+	anlogger.Debugf(nil, "lambda-initialization : clean.go : dax client was successfully initialized")
 }
 
 func handler(ctx context.Context) error {
@@ -88,10 +90,13 @@ func eraseTable(tableName, partitionKeyColumnName, sortKeyColumnName string, lc 
 			TableName:         aws.String(tableName),
 			ExclusiveStartKey: lastEvaluatedKey,
 		}
-		scanResult, err := awsDbClient.Scan(scanInput)
+		anlogger.Debugf(lc, "clean.go : start scan a batch")
+		scanResult, err := awsDaxClient.Scan(scanInput)
 		if err != nil {
+			anlogger.Errorf(lc, "clean.go : error during scan %s table : %v", tableName, err)
 			return errors.New(fmt.Sprintf("error during scan %s table", tableName))
 		}
+		anlogger.Debugf(lc, "clean.go : finish scan a batch")
 		items := scanResult.Items
 		for _, item := range items {
 			partitionKey := item[partitionKeyColumnName].S
@@ -107,10 +112,13 @@ func eraseTable(tableName, partitionKeyColumnName, sortKeyColumnName string, lc 
 				},
 				TableName: aws.String(tableName),
 			}
-			_, err = awsDbClient.DeleteItem(deleteInput)
+			anlogger.Debugf(lc, "clean.go : start delete using dax")
+			_, err = awsDaxClient.DeleteItem(deleteInput)
 			if err != nil {
-				return errors.New(fmt.Sprintf("error during delete from %s table", tableName))
+				anlogger.Errorf(lc, "clean.go : error during delete from %s table using dax : %v", tableName, err)
+				return errors.New(fmt.Sprintf("error during delete from %s table using dax", tableName))
 			}
+			anlogger.Debugf(lc, "clean.go : finish delete using dax")
 		}
 		lastEvaluatedKey = scanResult.LastEvaluatedKey
 		if len(lastEvaluatedKey) == 0 {

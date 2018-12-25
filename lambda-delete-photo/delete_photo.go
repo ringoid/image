@@ -4,7 +4,6 @@ import (
 	"context"
 	basicLambda "github.com/aws/aws-lambda-go/lambda"
 	"../apimodel"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/firehose"
 	"os"
@@ -18,10 +17,12 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/ringoid/commons"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
+	"github.com/aws/aws-dax-go/dax"
 )
 
 var anlogger *commons.Logger
-var awsDbClient *dynamodb.DynamoDB
+var daxClient dynamodbiface.DynamoDBAPI
 var awsDeliveryStreamClient *firehose.Firehose
 var deliveryStreamName string
 var internalAuthFunctionName string
@@ -106,8 +107,18 @@ func init() {
 	}
 	anlogger.Debugf(nil, "lambda-initialization : delete_photo.go : aws session was successfully initialized")
 
-	awsDbClient = dynamodb.New(awsSession)
-	anlogger.Debugf(nil, "lambda-initialization : delete_photo.go : dynamodb client was successfully initialized")
+	daxEndpoint, ok := os.LookupEnv("DAX_ENDPOINT")
+	if !ok {
+		anlogger.Fatalf(nil, "lambda-initialization : delete_photo.go : env can not be empty DAX_ENDPOINT")
+	}
+	cfg := dax.DefaultConfig()
+	cfg.HostPorts = []string{daxEndpoint}
+	cfg.Region = commons.Region
+	daxClient, err = dax.New(cfg)
+	if err != nil {
+		anlogger.Fatalf(nil, "lambda-initialization : delete_photo.go : error initialize DAX cluster")
+	}
+	anlogger.Debugf(nil, "lambda-initialization : delete_photo.go : dax client was successfully initialized")
 
 	clientLambda = lambda.New(awsSession)
 	anlogger.Debugf(nil, "lambda-initialization : delete_photo.go : lambda client was successfully initialized")
@@ -165,7 +176,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 
 	photoIds, originPhotoId := getAllPhotoIdsBasedOnSource(reqParam.PhotoId, userId, lc)
 	for _, val := range photoIds {
-		ok, errStr := apimodel.MarkPhotoAsDel(userId, val, userPhotoTable, awsDbClient, anlogger, lc)
+		ok, errStr := apimodel.MarkPhotoAsDelUpdate(userId, val, userPhotoTable, daxClient, anlogger, lc)
 		if !ok {
 			anlogger.Errorf(lc, "delete_photo.go : userId [%s], return %s to client", userId, errStr)
 			return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
@@ -185,7 +196,8 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	}
 
 	//Mark photo meta info like deleted also
-	ok, errStr = apimodel.MarkPhotoAsDel(userId+commons.PhotoPrimaryKeyMetaPostfix, originPhotoId, userPhotoTable, awsDbClient, anlogger, lc)
+	//will mark through update operation (can use DAX)
+	ok, errStr = apimodel.MarkPhotoAsDelUpdate(userId+commons.PhotoPrimaryKeyMetaPostfix, originPhotoId, userPhotoTable, daxClient, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "delete_photo.go : userId [%s], return %s to client", userId, errStr)
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil

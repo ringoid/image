@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	basicLambda "github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/aws"
 	"os"
 	"fmt"
@@ -14,10 +13,12 @@ import (
 	"errors"
 	"github.com/ringoid/commons"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
+	"github.com/aws/aws-dax-go/dax"
 )
 
 var anlogger *commons.Logger
-var awsDbClient *dynamodb.DynamoDB
+var daxClient dynamodbiface.DynamoDBAPI
 var userPhotoTable string
 
 var asyncTaskQueue string
@@ -71,8 +72,18 @@ func init() {
 	}
 	anlogger.Debugf(nil, "lambda-initialization : handle_stream.go : aws session was successfully initialized")
 
-	awsDbClient = dynamodb.New(awsSession)
-	anlogger.Debugf(nil, "lambda-initialization : handle_stream.go : dynamodb client was successfully initialized")
+	daxEndpoint, ok := os.LookupEnv("DAX_ENDPOINT")
+	if !ok {
+		anlogger.Fatalf(nil, "lambda-initialization : handle_stream.go : env can not be empty DAX_ENDPOINT")
+	}
+	cfg := dax.DefaultConfig()
+	cfg.HostPorts = []string{daxEndpoint}
+	cfg.Region = commons.Region
+	daxClient, err = dax.New(cfg)
+	if err != nil {
+		anlogger.Fatalf(nil, "lambda-initialization : handle_stream.go : error initialize DAX cluster")
+	}
+	anlogger.Debugf(nil, "lambda-initialization : handle_stream.go : dax client was successfully initialized")
 
 	awsSqsClient = sqs.New(awsSession)
 	anlogger.Debugf(nil, "lambda-initialization : handle_stream.go : sqs client was successfully initialized")
@@ -96,12 +107,12 @@ func handler(ctx context.Context, event events.KinesisEvent) (error) {
 
 		switch aEvent.EventType {
 		case commons.LikePhotoInternalEvent:
-			err = likePhoto(body, userPhotoTable, awsDbClient, lc, anlogger)
+			err = likePhotoUpdate(body, userPhotoTable, daxClient, lc, anlogger)
 			if err != nil {
 				return err
 			}
 		case commons.UserDeleteHimselfEvent:
-			err = deleteAllPhotos(body, userPhotoTable, asyncTaskQueue, awsSqsClient, awsDbClient, lc, anlogger)
+			err = deleteAllPhotos(body, userPhotoTable, asyncTaskQueue, awsSqsClient, daxClient, lc, anlogger)
 			if err != nil {
 				return err
 			}

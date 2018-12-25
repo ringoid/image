@@ -4,7 +4,6 @@ import (
 	"context"
 	basicLambda "github.com/aws/aws-lambda-go/lambda"
 	"../apimodel"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/firehose"
 	"os"
@@ -20,10 +19,12 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/ringoid/commons"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
+	"github.com/aws/aws-dax-go/dax"
 )
 
 var anlogger *commons.Logger
-var awsDbClient *dynamodb.DynamoDB
+var daxClient dynamodbiface.DynamoDBAPI
 var awsDeliveryStreamClient *firehose.Firehose
 var deliveryStreamName string
 var internalAuthFunctionName string
@@ -119,8 +120,18 @@ func init() {
 	}
 	anlogger.Debugf(nil, "lambda-initialization : internal_handle_upload.go : aws session was successfully initialized")
 
-	awsDbClient = dynamodb.New(awsSession)
-	anlogger.Debugf(nil, "lambda-initialization : internal_handle_upload.go : dynamodb client was successfully initialized")
+	daxEndpoint, ok := os.LookupEnv("DAX_ENDPOINT")
+	if !ok {
+		anlogger.Fatalf(nil, "lambda-initialization : internal_handle_upload.go : env can not be empty DAX_ENDPOINT")
+	}
+	cfg := dax.DefaultConfig()
+	cfg.HostPorts = []string{daxEndpoint}
+	cfg.Region = commons.Region
+	daxClient, err = dax.New(cfg)
+	if err != nil {
+		anlogger.Fatalf(nil, "lambda-initialization : internal_handle_upload.go : error initialize DAX cluster")
+	}
+	anlogger.Debugf(nil, "lambda-initialization : internal_handle_upload.go : dax client was successfully initialized")
 
 	clientLambda = lambda.New(awsSession)
 	anlogger.Debugf(nil, "lambda-initialization : internal_handle_upload.go : lambda client was successfully initialized")
@@ -170,7 +181,7 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 		anlogger.Debugf(lc, "internal_handle_upload.go : object was uploaded with bucket [%s], objectKey [%s], objectSize [%v]",
 			objectBucket, objectKey, objectSize)
 
-		userId, ok, errStr := getOwner(objectKey, lc)
+		userId, ok, errStr := apimodel.GetPhotoOwner(objectKey, photoUserMappingTableName, daxClient, anlogger, lc)
 		if !ok {
 			return errors.New(errStr)
 		}
@@ -210,7 +221,7 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 			Size:      objectSize,
 		}
 
-		ok, errStr = apimodel.SavePhoto(&userPhoto, userPhotoTable, awsDbClient, anlogger, lc)
+		ok, errStr = apimodel.SavePhotoUpdate(&userPhoto, userPhotoTable, daxClient, anlogger, lc)
 		if !ok && len(errStr) != 0 {
 			return errors.New(errStr)
 		} else if !ok && len(errStr) == 0 {
@@ -250,38 +261,6 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 	}
 	anlogger.Debugf(lc, "internal_handle_upload.go : successfully handle photo upload request %v", request)
 	return nil
-}
-
-//return userId (owner), was everything ok and error string
-func getOwner(objectKey string, lc *lambdacontext.LambdaContext) (string, bool, string) {
-	anlogger.Debugf(lc, "internal_handle_upload.go : find owner of object with a key [%s]", objectKey)
-	input := &dynamodb.GetItemInput{
-		Key: map[string]*dynamodb.AttributeValue{
-			commons.PhotoIdColumnName: {
-				S: aws.String(objectKey),
-			},
-		},
-		ConsistentRead: aws.Bool(true),
-		TableName:      aws.String(photoUserMappingTableName),
-	}
-
-	result, err := awsDbClient.GetItem(input)
-	if err != nil {
-		anlogger.Errorf(lc, "internal_handle_upload.go : error reading owner by object key [%s] : %v", objectKey, err)
-		return "", false, commons.InternalServerError
-	}
-
-	anlogger.Debugf(lc, "result : %v", result.Item)
-
-	if len(result.Item) == 0 {
-		anlogger.Warnf(lc, "internal_handle_upload.go : there is no owner for object with key [%s]", objectKey)
-		//we need such coz s3 call function async and in this case we don't need to retry
-		return "", true, ""
-	}
-
-	userId := *result.Item[commons.UserIdColumnName].S
-	anlogger.Debugf(lc, "internal_handle_upload.go : found owner with userId [%s] for object key [%s]", userId, objectKey)
-	return userId, true, ""
 }
 
 func main() {

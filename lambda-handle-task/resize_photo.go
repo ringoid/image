@@ -13,11 +13,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/anthonynsimon/bild/transform"
 	"image"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ringoid/commons"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 )
 
-func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3manager.Uploader, awsDbClient *dynamodb.DynamoDB, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) error {
+func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3manager.Uploader, daxClient dynamodbiface.DynamoDBAPI, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) error {
 	anlogger.Debugf(lc, "resize_photo.go : resize photo by request body [%s]", body)
 	var rTask apimodel.ResizePhotoAsyncTask
 	err := json.Unmarshal([]byte(body), &rTask)
@@ -59,7 +59,7 @@ func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3mana
 		PhotoSourceUri: link,
 	}
 
-	ok, errStr = apimodel.SavePhoto(userPhoto, rTask.TableName, awsDbClient, anlogger, lc)
+	ok, errStr = apimodel.SavePhotoUpdate(userPhoto, rTask.TableName, daxClient, anlogger, lc)
 	if !ok && len(errStr) != 0 {
 		return errors.New(errStr)
 	} else if !ok && len(errStr) == 0 {

@@ -11,6 +11,18 @@ Mappings:
       test: "logs7.papertrailapp.com:16637"
       prod: "logs7.papertrailapp.com:16747"
 
+  DaxName:
+    ImageDaxCluster:
+      test: test-dax-cluster-image
+      stage: stage-dax-cluster-image
+      prod: prod-dax-cluster-image
+
+  DaxNodeType:
+    ImageDaxCluster:
+      test: dax.t2.small
+      stage: dax.t2.small
+      prod: dax.t2.small
+
   FunctionName:
     GetPreSignedUrlFunction:
       test: test-get-presigned-url-image
@@ -66,7 +78,6 @@ Parameters:
     Type: String
     Default: ringoid-public-photo
 
-
 Globals:
     Function:
         Timeout: 300
@@ -95,6 +106,9 @@ Globals:
               Fn::ImportValue:
                 !Join [ "-", [ !Ref Env, InternalEventStreamExportName] ]
             NEED_WARM_UP_LAMBDA_NAMES: !Join [ ",", [ !FindInMap [FunctionName, GetPreSignedUrlFunction, !Ref Env], !FindInMap [FunctionName, GetOwnPhotosFunction, !Ref Env], !FindInMap [FunctionName, DeletePhotoFunction, !Ref Env], !FindInMap [FunctionName, InternalPresignFunction, !Ref Env], !FindInMap [FunctionName, InternalGetImagesFunction, !Ref Env]  ] ]
+            DAX_ENDPOINT:
+              Fn::ImportValue:
+                !Join [ "-", [ !Ref Env, DaxClusterExport] ]
         Tags:
           Company: Ringoid
           Service: image
@@ -139,6 +153,15 @@ Resources:
       Policies:
         - AWSLambdaFullAccess
         - AmazonDynamoDBFullAccess
+        - AWSLambdaVPCAccessExecutionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue:
+              !Join [ "-", [ !Ref Env, DaxSecurityGroupIdExport] ]
+        SubnetIds:
+          - subnet-500f9936
+          - subnet-6f8e5d35
+          - subnet-737d1c3b
 
   ScheduledWarmUpFunctionRule:
     Type: AWS::Events::Rule
@@ -178,6 +201,15 @@ Resources:
         - AmazonDynamoDBFullAccess
         - AWSLambdaFullAccess
         - AmazonKinesisFirehoseFullAccess
+        - AWSLambdaVPCAccessExecutionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue:
+              !Join [ "-", [ !Ref Env, DaxSecurityGroupIdExport] ]
+        SubnetIds:
+          - subnet-500f9936
+          - subnet-6f8e5d35
+          - subnet-737d1c3b
       Events:
         StartEvent:
           Type: Api
@@ -204,6 +236,15 @@ Resources:
         - AmazonKinesisFirehoseFullAccess
         - AmazonS3FullAccess
         - AmazonKinesisFullAccess
+        - AWSLambdaVPCAccessExecutionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue:
+              !Join [ "-", [ !Ref Env, DaxSecurityGroupIdExport] ]
+        SubnetIds:
+          - subnet-500f9936
+          - subnet-6f8e5d35
+          - subnet-737d1c3b
 
   PublicPhotoBucket:
     Type: AWS::S3::Bucket
@@ -221,6 +262,15 @@ Resources:
       Policies:
         - AmazonDynamoDBFullAccess
         - AWSLambdaFullAccess
+        - AWSLambdaVPCAccessExecutionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue:
+              !Join [ "-", [ !Ref Env, DaxSecurityGroupIdExport] ]
+        SubnetIds:
+          - subnet-500f9936
+          - subnet-6f8e5d35
+          - subnet-737d1c3b
       Events:
         StartEvent:
           Type: Api
@@ -241,6 +291,15 @@ Resources:
         - AWSLambdaFullAccess
         - AmazonKinesisFirehoseFullAccess
         - AmazonSQSFullAccess
+        - AWSLambdaVPCAccessExecutionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue:
+              !Join [ "-", [ !Ref Env, DaxSecurityGroupIdExport] ]
+        SubnetIds:
+          - subnet-500f9936
+          - subnet-6f8e5d35
+          - subnet-737d1c3b
       Events:
         StartEvent:
           Type: Api
@@ -278,6 +337,15 @@ Resources:
         - AmazonDynamoDBFullAccess
         - AmazonSQSFullAccess
         - AmazonS3FullAccess
+        - AWSLambdaVPCAccessExecutionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue:
+              !Join [ "-", [ !Ref Env, DaxSecurityGroupIdExport] ]
+        SubnetIds:
+          - subnet-500f9936
+          - subnet-6f8e5d35
+          - subnet-737d1c3b
       Events:
         StartEvent:
           Type: SQS
@@ -299,6 +367,15 @@ Resources:
         - AmazonKinesisFullAccess
         - AmazonDynamoDBFullAccess
         - AmazonSQSFullAccess
+        - AWSLambdaVPCAccessExecutionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue:
+              !Join [ "-", [ !Ref Env, DaxSecurityGroupIdExport] ]
+        SubnetIds:
+          - subnet-500f9936
+          - subnet-6f8e5d35
+          - subnet-737d1c3b
       Events:
         CommonEventStreamEvent:
           Type: Kinesis
@@ -318,6 +395,15 @@ Resources:
       Description: Internal Get Images function
       Policies:
         - AmazonDynamoDBFullAccess
+        - AWSLambdaVPCAccessExecutionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue:
+              !Join [ "-", [ !Ref Env, DaxSecurityGroupIdExport] ]
+        SubnetIds:
+          - subnet-500f9936
+          - subnet-6f8e5d35
+          - subnet-737d1c3b
 
   PhotoUserMappingTable:
     Type: AWS::DynamoDB::Table
