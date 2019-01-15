@@ -236,6 +236,11 @@ func parseParams(params string, lc *lambdacontext.LambdaContext) (*apimodel.Dele
 		return nil, false, commons.InternalServerError
 	}
 
+	if req.AccessToken == "" {
+		anlogger.Errorf(lc, "delete_photo.go : accessToken is empty")
+		return nil, false, commons.WrongRequestParamsClientError
+	}
+
 	if req.PhotoId == "" {
 		anlogger.Errorf(lc, "delete_photo.go : wrong required param photoId [%s]", req.PhotoId)
 		return nil, false, commons.WrongRequestParamsClientError

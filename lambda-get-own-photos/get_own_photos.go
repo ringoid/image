@@ -130,8 +130,14 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	accessToken := request.QueryStringParameters["accessToken"]
-	resolution := request.QueryStringParameters["resolution"]
+	accessToken, okA := request.QueryStringParameters["accessToken"]
+	resolution, okR := request.QueryStringParameters["resolution"]
+
+	if !okA || !okR {
+		errStr := commons.WrongRequestParamsClientError
+		anlogger.Errorf(lc, "get_own_photos.go : one or both of required params (accessToken || resolution) is empty", errStr)
+		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+	}
 
 	if !commons.AllowedPhotoResolution[resolution] {
 		errStr := commons.WrongRequestParamsClientError

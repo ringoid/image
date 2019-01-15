@@ -257,6 +257,11 @@ func parseParams(params string, lc *lambdacontext.LambdaContext) (*apimodel.GetP
 		return nil, false, commons.InternalServerError
 	}
 
+	if req.AccessToken == "" {
+		anlogger.Errorf(lc, "get_presigned_url.go : empty required param accessToken")
+		return nil, false, commons.WrongRequestParamsClientError
+	}
+
 	if req.Extension == "" {
 		anlogger.Errorf(lc, "get_presigned_url.go : wrong required param extension [%s]", req.Extension)
 		return nil, false, commons.WrongRequestParamsClientError
