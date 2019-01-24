@@ -59,7 +59,7 @@ type OwnPhoto struct {
 	PhotoUri      string `json:"photoUri"`
 	Likes         int    `json:"likes"`
 	OriginPhotoId string `json:"originPhotoId"`
-	Warning       bool   `json:"warning"`
+	Blocked       bool   `json:"blocked"`
 }
 
 func (obj OwnPhoto) String() string {
