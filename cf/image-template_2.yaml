@@ -233,6 +233,7 @@ Resources:
       Policies:
         - AmazonDynamoDBFullAccess
         - AWSLambdaFullAccess
+        - AmazonKinesisFirehoseFullAccess
       Events:
         StartEvent:
           Type: Api
@@ -290,6 +291,7 @@ Resources:
         - AmazonDynamoDBFullAccess
         - AmazonSQSFullAccess
         - AmazonS3FullAccess
+        - AmazonKinesisFirehoseFullAccess
       Events:
         StartEvent:
           Type: SQS
@@ -311,6 +313,7 @@ Resources:
         - AmazonKinesisFullAccess
         - AmazonDynamoDBFullAccess
         - AmazonSQSFullAccess
+        - AmazonKinesisFirehoseFullAccess
       Events:
         CommonEventStreamEvent:
           Type: Kinesis
@@ -330,6 +333,7 @@ Resources:
       Description: Internal Get Images function
       Policies:
         - AmazonDynamoDBFullAccess
+        - AmazonKinesisFirehoseFullAccess
 
   PhotoUserMappingTable:
     Type: AWS::DynamoDB::Table
