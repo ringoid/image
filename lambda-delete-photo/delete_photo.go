@@ -14,7 +14,6 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go/service/lambda"
-	"strings"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/ringoid/commons"
@@ -163,7 +162,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
 	}
 
-	photoIds, originPhotoId := getAllPhotoIdsBasedOnSource(reqParam.PhotoId, userId, lc)
+	photoIds, originPhotoId := apimodel.GetAllPhotoIdsBasedOnSource(reqParam.PhotoId, userId, anlogger, lc)
 	for _, val := range photoIds {
 		ok, errStr := apimodel.MarkPhotoAsDel(userId, val, userPhotoTable, awsDbClient, anlogger, lc)
 		if !ok {
@@ -211,20 +210,6 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	anlogger.Debugf(lc, "delete_photo.go : return successful resp [%s] for userId [%s]", string(body), userId)
 	anlogger.Infof(lc, "delete_photo.go : successfully delete photo with photoId [%s] for userId [%s]", reqParam.PhotoId, userId)
 	return events.APIGatewayProxyResponse{StatusCode: 200, Body: string(body)}, nil
-}
-
-func getAllPhotoIdsBasedOnSource(sourceId, userId string, lc *lambdacontext.LambdaContext) ([]string, string) {
-	anlogger.Debugf(lc, "delete_photo.go : make del photo id list based on photoId [%s] for userId [%s]", sourceId, userId)
-	arr := strings.Split(sourceId, "_")
-	baseId := arr[1]
-	allIds := make([]string, 0)
-	originPhotoId, _ := commons.GetOriginPhotoId(userId, sourceId, anlogger, lc)
-	allIds = append(allIds, originPhotoId)
-	for key, _ := range commons.AllowedPhotoResolution {
-		allIds = append(allIds, key+"_"+baseId)
-	}
-	anlogger.Debugf(lc, "delete_photo.go : successfully create del photo id list based on photoId [%s] for userId [%s], del list=%v", sourceId, userId, allIds)
-	return allIds, originPhotoId
 }
 
 func parseParams(params string, lc *lambdacontext.LambdaContext) (*apimodel.DeletePhotoReq, bool, string) {

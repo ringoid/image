@@ -16,7 +16,7 @@ build:
 	@echo '--- Building warmup-image function ---'
 	GOOS=linux go build lambda-warmup/warm_up.go
 	@echo '--- Building lambda-handle-stream-image function ---'
-	GOOS=linux go build lambda-handle-stream/handle_stream.go lambda-handle-stream/like_photo.go lambda-handle-stream/delete_user.go
+	GOOS=linux go build lambda-handle-stream/handle_stream.go lambda-handle-stream/like_photo.go lambda-handle-stream/delete_user.go lambda-handle-stream/hide_photo.go
 	@echo '--- Building internal-get-images-image function ---'
 	GOOS=linux go build lambda-internal-getimages/get_images.go
 	@echo '--- Building internal-clean-db-image function ---'

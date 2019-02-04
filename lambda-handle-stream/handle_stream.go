@@ -105,7 +105,13 @@ func handler(ctx context.Context, event events.KinesisEvent) (error) {
 			if err != nil {
 				return err
 			}
+		case commons.HideUserPhotoInternalEvent:
+			err = hidePhoto(body, userPhotoTable, asyncTaskQueue, awsSqsClient, awsDbClient, lc, anlogger)
+			if err != nil {
+				return err
+			}
 		}
+
 	}
 
 	anlogger.Debugf(lc, "handle_stream.go : successfully complete handle request with [%d] records", len(event.Records))

@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/ringoid/commons"
+	"strings"
 )
 
 //return ok and error string
@@ -109,4 +110,18 @@ func MarkPhotoAsDel(userId, photoId, tableName string, awsDbClient *dynamodb.Dyn
 	}
 	anlogger.Debugf(lc, "common_action.go : successfully mark photoId [%s] as deleted for userId [%s]", photoId, userId)
 	return true, ""
+}
+
+func GetAllPhotoIdsBasedOnSource(sourceId, userId string, anlogger *commons.Logger, lc *lambdacontext.LambdaContext) ([]string, string) {
+	anlogger.Debugf(lc, "common_action.go : make del photo id list based on photoId [%s] for userId [%s]", sourceId, userId)
+	arr := strings.Split(sourceId, "_")
+	baseId := arr[1]
+	allIds := make([]string, 0)
+	originPhotoId, _ := commons.GetOriginPhotoId(userId, sourceId, anlogger, lc)
+	allIds = append(allIds, originPhotoId)
+	for key, _ := range commons.AllowedPhotoResolution {
+		allIds = append(allIds, key+"_"+baseId)
+	}
+	anlogger.Debugf(lc, "common_action.go : successfully create del photo id list based on photoId [%s] for userId [%s], del list=%v", sourceId, userId, allIds)
+	return allIds, originPhotoId
 }
