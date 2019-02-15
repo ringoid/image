@@ -140,10 +140,8 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	}
 
 	if !commons.AllowedPhotoResolution[resolution] {
-		errStr := commons.WrongRequestParamsClientError
-		anlogger.Errorf(lc, "get_own_photos : resolution [%s] is not supported", resolution)
-		anlogger.Errorf(lc, "get_own_photos.go : return %s to client", errStr)
-		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+		anlogger.Warnf(lc, "get_own_photos.go : resolution [%s] is not supported, so use [%s] resolution", resolution, commons.BiggestDefaultPhotoResolution)
+		resolution = commons.BiggestDefaultPhotoResolution
 	}
 
 	userId, ok, _, errStr := commons.CallVerifyAccessToken(appVersion, isItAndroid, accessToken, internalAuthFunctionName, clientLambda, anlogger, lc)
