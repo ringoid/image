@@ -32,7 +32,7 @@ stage-deploy-internal:
 
 prod-deploy-internal:
 	@echo '--- Build and deploy PresignFunction to PROD ---'
-	cd image-java-internal && gradle build :presign-url-function:migratePresignFunctionToStage
+	cd image-java-internal && gradle build :presign-url-function:migratePresignFunctionToProd
 
 zip_lambda: build
 	@echo '--- Zip getpresigned-image function ---'
