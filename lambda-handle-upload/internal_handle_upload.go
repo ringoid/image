@@ -225,7 +225,7 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 			return nil
 		}
 
-		anlogger.Infof(lc, "internal_handle_upload.go : successfully save origin photo %v for userId [%s]", userPhoto, userPhoto.UserId)
+		anlogger.Infof(lc, "internal_handle_upload.go : successfully save origin photo %s for userId [%s]", userPhoto.OriginPhotoId, userPhoto.UserId)
 
 		event := commons.NewUserUploadedPhotoEvent(userPhoto.UserId, userPhoto.Bucket, userPhoto.Key, userPhoto.PhotoId, userPhoto.PhotoType, userPhoto.Size)
 		commons.SendAnalyticEvent(event, userPhoto.UserId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
