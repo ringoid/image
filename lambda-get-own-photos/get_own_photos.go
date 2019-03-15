@@ -113,21 +113,25 @@ func init() {
 	anlogger.Debugf(nil, "lambda-initialization : get_own_photos.go : firehose client was successfully initialized")
 }
 
-func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+func handler(ctx context.Context, request events.ALBTargetGroupRequest) (events.ALBTargetGroupResponse, error) {
 	lc, _ := lambdacontext.FromContext(ctx)
 
-	anlogger.Debugf(lc, "get_own_photos.go : start handle request %v", request)
-
-	sourceIp := request.RequestContext.Identity.SourceIP
-
-	if commons.IsItWarmUpRequest(request.Body, anlogger, lc) {
-		return events.APIGatewayProxyResponse{}, nil
+	userAgent := request.Headers["user-agent"]
+	if strings.HasPrefix(userAgent, "ELB-HealthChecker") {
+		return commons.NewServiceResponse("{}"), nil
 	}
+
+	if request.HTTPMethod != "GET" {
+		return commons.NewWrongHttpMethodServiceResponse(), nil
+	}
+	sourceIp := request.Headers["x-forwarded-for"]
+
+	anlogger.Debugf(lc, "get_own_photos.go : start handle request %v", request)
 
 	appVersion, isItAndroid, ok, errStr := commons.ParseAppVersionFromHeaders(request.Headers, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "get_own_photos.go : return %s to client", errStr)
-		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+		return commons.NewServiceResponse(errStr), nil
 	}
 
 	accessToken, okA := request.QueryStringParameters["accessToken"]
@@ -136,7 +140,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	if !okA || !okR {
 		errStr := commons.WrongRequestParamsClientError
 		anlogger.Errorf(lc, "get_own_photos.go : one or both of required params (accessToken || resolution) is empty", errStr)
-		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+		return commons.NewServiceResponse(errStr), nil
 	}
 
 	if !commons.AllowedPhotoResolution[resolution] {
@@ -147,19 +151,19 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	userId, ok, _, errStr := commons.CallVerifyAccessToken(appVersion, isItAndroid, accessToken, internalAuthFunctionName, clientLambda, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "get_own_photos.go : return %s to client", errStr)
-		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+		return commons.NewServiceResponse(errStr), nil
 	}
 
 	photos, ok, errStr := getOwnPhotos(userId, resolution, lc)
 	if !ok {
 		anlogger.Errorf(lc, "get_own_photos.go : userId [%s], return %s to client", userId, errStr)
-		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+		return commons.NewServiceResponse(errStr), nil
 	}
 
 	metaMap, ok, errStr := getMetaInfs(userId, lc)
 	if !ok {
 		anlogger.Errorf(lc, "get_own_photos.go : userId [%s], return %s to client", userId, errStr)
-		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+		return commons.NewServiceResponse(errStr), nil
 	}
 
 	photos = fillMetaPhotoInf(photos, metaMap)
@@ -184,12 +188,12 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	if err != nil {
 		anlogger.Errorf(lc, "get_own_photos.go : error while marshaling resp [%v] object for userId [%s] : %v", resp, userId, err)
 		anlogger.Errorf(lc, "get_own_photos.go : userId [%s], return %s to client", userId, commons.InternalServerError)
-		return events.APIGatewayProxyResponse{StatusCode: 200, Body: commons.InternalServerError}, nil
+		return commons.NewServiceResponse(commons.InternalServerError), nil
 	}
 	anlogger.Debugf(lc, "get_own_photos.go : return successful resp [%s] for userId [%s]", string(body), userId)
 
 	anlogger.Infof(lc, "get_own_photos.go : return [%d] own photos to the user with userId [%s]", len(resp.Photos), userId)
-	return events.APIGatewayProxyResponse{StatusCode: 200, Body: string(body)}, nil
+	return commons.NewServiceResponse(string(body)), nil
 }
 
 func fillMetaPhotoInf(source []*apimodel.UserPhoto, metaMap map[string]*apimodel.UserPhotoMetaInf) []*apimodel.UserPhoto {

@@ -13,8 +13,6 @@ build:
 	GOOS=linux go build lambda-delete-photo/delete_photo.go
 	@echo '--- Building lambda-handle-task-image function ---'
 	GOOS=linux go build lambda-handle-task/internal_handle_task.go lambda-handle-task/remove_photo.go lambda-handle-task/resize_photo.go lambda-handle-task/remove_s3_object.go
-	@echo '--- Building warmup-image function ---'
-	GOOS=linux go build lambda-warmup/warm_up.go
 	@echo '--- Building lambda-handle-stream-image function ---'
 	GOOS=linux go build lambda-handle-stream/handle_stream.go lambda-handle-stream/like_photo.go lambda-handle-stream/delete_user.go lambda-handle-stream/hide_photo.go
 	@echo '--- Building internal-get-images-image function ---'
@@ -45,8 +43,6 @@ zip_lambda: build
 	zip delete_photo.zip ./delete_photo
 	@echo '--- Zip internal-handle-task-image function ---'
 	zip internal_handle_task.zip ./internal_handle_task
-	@echo '--- Zip warmup-image function ---'
-	zip warmup-image.zip ./warm_up
 	@echo '--- Zip lambda-handle-stream-image function ---'
 	zip handle_stream.zip ./handle_stream
 	@echo '--- Zip internal-get-images-image function ---'
@@ -112,8 +108,6 @@ clean:
 	rm -rf delete_photo
 	rm -rf internal_handle_task.zip
 	rm -rf internal_handle_task
-	rm -rf warmup-image.zip
-	rm -rf warm_up
 	rm -rf handle_stream
 	rm -rf handle_stream.zip
 	rm -rf get_images.zip

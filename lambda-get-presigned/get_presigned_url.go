@@ -19,6 +19,7 @@ import (
 	"crypto/sha1"
 	"github.com/satori/go.uuid"
 	"github.com/ringoid/commons"
+	"strings"
 )
 
 var anlogger *commons.Logger
@@ -107,33 +108,37 @@ func init() {
 	anlogger.Debugf(nil, "lambda-initialization : get_presigned_url.go : firehose client was successfully initialized")
 }
 
-func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+func handler(ctx context.Context, request events.ALBTargetGroupRequest) (events.ALBTargetGroupResponse, error) {
 	lc, _ := lambdacontext.FromContext(ctx)
 
-	anlogger.Debugf(lc, "get_presigned_url.go : start handle request %v", request)
-
-	sourceIp := request.RequestContext.Identity.SourceIP
-
-	if commons.IsItWarmUpRequest(request.Body, anlogger, lc) {
-		return events.APIGatewayProxyResponse{}, nil
+	userAgent := request.Headers["user-agent"]
+	if strings.HasPrefix(userAgent, "ELB-HealthChecker") {
+		return commons.NewServiceResponse("{}"), nil
 	}
+
+	if request.HTTPMethod != "POST" {
+		return commons.NewWrongHttpMethodServiceResponse(), nil
+	}
+	sourceIp := request.Headers["x-forwarded-for"]
+
+	anlogger.Debugf(lc, "get_presigned_url.go : start handle request %v", request)
 
 	appVersion, isItAndroid, ok, errStr := commons.ParseAppVersionFromHeaders(request.Headers, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "get_presigned_url.go : return %s to client", errStr)
-		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+		return commons.NewServiceResponse(errStr), nil
 	}
 
 	reqParam, ok, errStr := parseParams(request.Body, lc)
 	if !ok {
 		anlogger.Errorf(lc, "get_presigned_url.go : return %s to client", errStr)
-		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+		return commons.NewServiceResponse(errStr), nil
 	}
 
 	userId, ok, _, errStr := commons.CallVerifyAccessToken(appVersion, isItAndroid, reqParam.AccessToken, internalAuthFunctionName, clientLambda, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "get_presigned_url.go : return %s to client", errStr)
-		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+		return commons.NewServiceResponse(errStr), nil
 	}
 
 	needToRetry := true
@@ -143,13 +148,13 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		photoId, ok, errStr = generatePhotoId(userId, lc)
 		if !ok {
 			anlogger.Errorf(lc, "get_presigned_url.go : return %s to client", errStr)
-			return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+			return commons.NewServiceResponse(errStr), nil
 		}
 		s3Key = photoId + "_photo." + reqParam.Extension
 		wasCreated, retry, errStr := createPhotoIdUserIdMapping(s3Key, userId, lc)
 		if !wasCreated && !needToRetry {
 			anlogger.Errorf(lc, "get_presigned_url.go : return %s to client", errStr)
-			return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+			return commons.NewServiceResponse(errStr), nil
 		}
 		needToRetry = retry
 	}
@@ -157,7 +162,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	uri, ok, errStr := makePresignUrl(userId, originPhotoBucketName, s3Key, presignFunctionName, lc)
 	if !ok {
 		anlogger.Errorf(lc, "get_presigned_url.go : return %s to client", errStr)
-		return events.APIGatewayProxyResponse{StatusCode: 200, Body: errStr}, nil
+		return commons.NewServiceResponse(errStr), nil
 	}
 
 	event := commons.NewUserAskUploadLinkEvent(originPhotoBucketName, s3Key, userId, sourceIp)
@@ -172,11 +177,11 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	if err != nil {
 		anlogger.Errorf(lc, "get_presigned_url.go : error while marshaling resp [%v] object for userId [%s] : %v", resp, userId, err)
 		anlogger.Errorf(lc, "get_presigned_url.go : userId [%s], return %s to client", userId, commons.InternalServerError)
-		return events.APIGatewayProxyResponse{StatusCode: 200, Body: commons.InternalServerError}, nil
+		return commons.NewServiceResponse(commons.InternalServerError), nil
 	}
 
 	anlogger.Infof(lc, "get_presigned_url.go : return presign url for userId [%s]", userId)
-	return events.APIGatewayProxyResponse{StatusCode: 200, Body: string(body)}, nil
+	return commons.NewServiceResponse(string(body)), nil
 }
 
 //return was mapping created, need to retry and error string

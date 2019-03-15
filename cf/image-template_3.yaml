@@ -16,26 +16,38 @@ Mappings:
       test: test-get-presigned-url-image
       stage: stage-get-presigned-url-image
       prod: prod-get-presigned-url-image
+    GetPreSignedUrlFunctionTargetGroup:
+      test: test-get-presigned-url-image-tg
+      stage: stage-get-presigned-url-image-tg
+      prod: prod-get-presigned-url-image-tg
+
     InternalHandleUploadFunction:
       test: test-internal-handle-upload-image
       stage: stage-internal-handle-upload-image
       prod: prod-internal-handle-upload-image
+
     GetOwnPhotosFunction:
       test: test-get-own-photos-image
       stage: stage-get-own-photos-image
       prod: prod-get-own-photos-image
+    GetOwnPhotosFunctionTargetGroup:
+      test: test-get-own-photos-image-tg
+      stage: stage-get-own-photos-image-tg
+      prod: prod-get-own-photos-image-tg
+
     DeletePhotoFunction:
       test: test-delete-photo-image
       stage: stage-delete-photo-image
       prod: prod-delete-photo-image
+    DeletePhotoFunctionTargetGroup:
+      test: test-delete-photo-image-tg
+      stage: stage-delete-photo-image-tg
+      prod: prod-delete-photo-image-tg
+
     InternalHandleAsyncTaskFunction:
       test: test-internal-handle-async-task-image
       stage: stage-internal-handle-async-task-image
       prod: prod-internal-handle-async-task-image
-    WarmUpFunction:
-      test: test-warm-up-image
-      stage: stage-warm-up-image
-      prod: prod-warm-up-image
     InternalPresignFunction:
       test: test-internal-presign-url-image
       stage: stage-internal-presign-url-image
@@ -102,33 +114,6 @@ Globals:
 
 Resources:
 
-  ImageApi:
-    Type: AWS::Serverless::Api
-    Properties:
-      Name: !Ref AWS::StackName
-      StageName: Prod
-
-  APIBasePathMapping:
-    Type: AWS::ApiGateway::BasePathMapping
-    DependsOn: ImageApiProdStage
-    Properties:
-      BasePath: image
-      DomainName:
-        Fn::ImportValue:
-          !Join [ "-", [ !Ref Env, APIDomainNameExport] ]
-      RestApiId: !Ref ImageApi
-      Stage: Prod
-
-  WarmUpFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !FindInMap [FunctionName, WarmUpFunction, !Ref Env]
-      Handler: warm_up
-      CodeUri: ../warmup-image.zip
-      Description: WarmUp image function
-      Policies:
-        - AWSLambdaFullAccess
-
   InternalCleanDbImageFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -139,33 +124,6 @@ Resources:
       Policies:
         - AWSLambdaFullAccess
         - AmazonDynamoDBFullAccess
-
-  ScheduledWarmUpFunctionRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Description: Scheduled WarmUp lambda function rule
-      ScheduleExpression: rate(8 minutes)
-      State: ENABLED
-      Name: !Join [ "-", [ !Ref Env, warm_up_image_function_rule] ]
-      Targets:
-        -
-          Arn:
-            Fn::GetAtt:
-              - WarmUpFunction
-              - Arn
-          Id: ScheduledWarmUpFunctionRuleId
-
-  PermissionForEventsToInvokeWarmUpFunction:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref WarmUpFunction
-      Action: lambda:InvokeFunction
-      Principal: events.amazonaws.com
-      SourceArn:
-        Fn::GetAtt:
-          - ScheduledWarmUpFunctionRule
-          - Arn
-
 
   GetPreSignedUrlFunction:
     Type: AWS::Serverless::Function
@@ -178,13 +136,32 @@ Resources:
         - AmazonDynamoDBFullAccess
         - AWSLambdaFullAccess
         - AmazonKinesisFirehoseFullAccess
-      Events:
-        StartEvent:
-          Type: Api
-          Properties:
-            Path: /get_presigned
-            Method: post
-            RestApiId: !Ref ImageApi
+
+  GetPreSignedUrlTargetGroup:
+    Type: Custom::CreateTargetGroup
+    Properties:
+      ServiceToken:
+        Fn::ImportValue:
+          !Join [ "-", [ !Ref Env, CustomResourceFunctionExport] ]
+      CustomName: !FindInMap [FunctionName, GetPreSignedUrlFunctionTargetGroup, !Ref Env]
+      CustomTargetsId: !GetAtt GetPreSignedUrlFunction.Arn
+      TargetLambdaFunctionName: !Ref GetPreSignedUrlFunction
+
+  GetPreSignedUrlListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !GetAtt GetPreSignedUrlTargetGroup.TargetGroupArn
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - "/image/get_presigned"
+      ListenerArn:
+        Fn::ImportValue:
+          !Join [ "-", [ !Ref Env, ListenerArnExport] ]
+      Priority: 201
+
 
   OriginPhotoBucket:
     Type: AWS::S3::Bucket
@@ -239,13 +216,31 @@ Resources:
         - AmazonDynamoDBFullAccess
         - AWSLambdaFullAccess
         - AmazonKinesisFirehoseFullAccess
-      Events:
-        StartEvent:
-          Type: Api
-          Properties:
-            Path: /get_own_photos
-            Method: get
-            RestApiId: !Ref ImageApi
+
+  GetOwnPhotosTargetGroup:
+    Type: Custom::CreateTargetGroup
+    Properties:
+      ServiceToken:
+        Fn::ImportValue:
+          !Join [ "-", [ !Ref Env, CustomResourceFunctionExport] ]
+      CustomName: !FindInMap [FunctionName, GetOwnPhotosFunctionTargetGroup, !Ref Env]
+      CustomTargetsId: !GetAtt GetOwnPhotosFunction.Arn
+      TargetLambdaFunctionName: !Ref GetOwnPhotosFunction
+
+  GetOwnPhotosListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !GetAtt GetOwnPhotosTargetGroup.TargetGroupArn
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - "/image/get_own_photos"
+      ListenerArn:
+        Fn::ImportValue:
+          !Join [ "-", [ !Ref Env, ListenerArnExport] ]
+      Priority: 202
 
   DeletePhotoFunction:
     Type: AWS::Serverless::Function
@@ -259,13 +254,31 @@ Resources:
         - AWSLambdaFullAccess
         - AmazonKinesisFirehoseFullAccess
         - AmazonSQSFullAccess
-      Events:
-        StartEvent:
-          Type: Api
-          Properties:
-            Path: /delete_photo
-            Method: post
-            RestApiId: !Ref ImageApi
+
+  DeletePhotoTargetGroup:
+    Type: Custom::CreateTargetGroup
+    Properties:
+      ServiceToken:
+        Fn::ImportValue:
+          !Join [ "-", [ !Ref Env, CustomResourceFunctionExport] ]
+      CustomName: !FindInMap [FunctionName, DeletePhotoFunctionTargetGroup, !Ref Env]
+      CustomTargetsId: !GetAtt DeletePhotoFunction.Arn
+      TargetLambdaFunctionName: !Ref DeletePhotoFunction
+
+  DeletePhotoListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !GetAtt DeletePhotoTargetGroup.TargetGroupArn
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - "/image/delete_photo"
+      ListenerArn:
+        Fn::ImportValue:
+          !Join [ "-", [ !Ref Env, ListenerArnExport] ]
+      Priority: 203
 
   AsyncTaskSqsQueue:
     Type: AWS::SQS::Queue
