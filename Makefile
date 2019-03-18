@@ -1,5 +1,10 @@
+stage-last-stack: clean stage-last-stack
 stage-all: clean stage-deploy
+
+test-last-stack: clean test-last-stack
 test-all: clean test-deploy
+
+prod-last-stack: clean prod-last-stack
 prod-all: clean prod-deploy
 
 build:
@@ -65,9 +70,16 @@ test-deploy: test-deploy-internal zip_lambda
 	@echo 'Deploy test-image-stack 3 phase'
 	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name test-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=test --no-fail-on-empty-changeset
 
+test-last-stack: test-deploy-internal zip_lambda
+	@echo '--- Build lambda test ---'
+	@echo 'Package template 3 phase'
+	sam package --template-file cf/image-template_3.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
+	@echo 'Deploy test-image-stack 3 phase'
+	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name test-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=test --no-fail-on-empty-changeset
+
 stage-deploy: stage-deploy-internal zip_lambda
 	@echo '--- Build lambda stage ---'
-	@echo 'Package template 1 phase'
+	@echo 'Package tem	plate 1 phase'
 	sam package --template-file cf/image-template_1.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
 	@echo 'Deploy stage-image-stack 1 phase'
 	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name stage-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=stage --no-fail-on-empty-changeset
@@ -75,6 +87,13 @@ stage-deploy: stage-deploy-internal zip_lambda
 	sam package --template-file cf/image-template_2.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
 	@echo 'Deploy stage-image-stack 2 phase'
 	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name stage-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=stage --no-fail-on-empty-changeset
+	@echo 'Package template 3 phase'
+	sam package --template-file cf/image-template_3.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
+	@echo 'Deploy stage-image-stack 3 phase'
+	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name stage-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=stage --no-fail-on-empty-changeset
+
+stage-last-stack: stage-deploy-internal zip_lambda
+	@echo '--- Build lambda stage ---'
 	@echo 'Package template 3 phase'
 	sam package --template-file cf/image-template_3.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
 	@echo 'Deploy stage-image-stack 3 phase'
@@ -90,6 +109,13 @@ prod-deploy: prod-deploy-internal zip_lambda
 	sam package --template-file cf/image-template_2.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
 	@echo 'Deploy prod-image-stack 2 phase'
 	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name prod-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=prod --no-fail-on-empty-changeset
+	@echo 'Package template 3 phase'
+	sam package --template-file cf/image-template_3.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
+	@echo 'Deploy prod-image-stack 3 phase'
+	sam deploy --template-file image-template-packaged.yaml --s3-bucket ringoid-cloudformation-template --stack-name prod-image-stack --capabilities CAPABILITY_IAM --parameter-overrides Env=prod --no-fail-on-empty-changeset
+
+prod-last-stack: prod-deploy-internal zip_lambda
+	@echo '--- Build lambda prod ---'
 	@echo 'Package template 3 phase'
 	sam package --template-file cf/image-template_3.yaml --s3-bucket ringoid-cloudformation-template --output-template-file image-template-packaged.yaml
 	@echo 'Deploy prod-image-stack 3 phase'

@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/ringoid/commons"
+	"github.com/aws/aws-sdk-go/service/kinesis"
 )
 
 var anlogger *commons.Logger
@@ -23,6 +24,8 @@ var awsDbClient *dynamodb.DynamoDB
 var awsS3Client *s3.S3
 var downloader *s3manager.Downloader
 var uploader *s3manager.Uploader
+var commonStreamName string
+var awsKinesisClient *kinesis.Kinesis
 
 func init() {
 	var env string
@@ -60,6 +63,16 @@ func init() {
 	}
 	anlogger.Debugf(nil, "lambda-initialization : internal_handle_task.go : aws session was successfully initialized")
 
+	commonStreamName, ok = os.LookupEnv("COMMON_STREAM")
+	if !ok {
+		anlogger.Fatalf(nil, "lambda-initialization : internal_handle_task.go : env can not be empty COMMON_STREAM")
+		os.Exit(1)
+	}
+	anlogger.Debugf(nil, "lambda-initialization : internal_handle_task.go : start with DELIVERY_STREAM = [%s]", commonStreamName)
+
+	awsKinesisClient = kinesis.New(awsSession)
+	anlogger.Debugf(nil, "lambda-initialization : internal_handle_task.go : kinesis client was successfully initialized")
+
 	awsDbClient = dynamodb.New(awsSession)
 	anlogger.Debugf(nil, "lambda-initialization : internal_handle_task.go : dynamodb client was successfully initialized")
 
@@ -95,7 +108,7 @@ func handler(ctx context.Context, event events.SQSEvent) (error) {
 				return err
 			}
 		case apimodel.ImageResizePhotoTaskType:
-			err = resizePhoto([]byte(body), downloader, uploader, awsDbClient, lc, anlogger)
+			err = resizePhoto([]byte(body), downloader, uploader, awsDbClient, commonStreamName, awsKinesisClient, lc, anlogger)
 			if err != nil {
 				return err
 			}

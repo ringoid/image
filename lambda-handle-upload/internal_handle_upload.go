@@ -180,19 +180,16 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 			return nil
 		}
 
-		//todo: uncomment before prod
-		//if objectSize >= commons.DefaultMaxPhotoSize {
-		//	anlogger.Warnf(lc, "internal_handle_upload.go : uploaded object too big, bucket [%s], objectKey [%s], objectSize [%v] for userId [%s]",
-		//		objectBucket, objectKey, objectSize, userId)
-		//	task := apimodel.NewRemoveS3ObjectAsyncTask(objectBucket, objectKey)
-		//	ok, errStr = apimodel.SendAsyncTask(task, asyncTaskQueue, userId, awsSqsClient, anlogger, lc)
-		//	if !ok {
-		//		return errors.New(errStr)
-		//	}
-		//	event := apimodel.NewRemoveTooLargeObjectEvent(userId, objectBucket, objectKey, objectSize)
-		//	apimodel.SendAnalyticEvent(event, userId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
-		//	return nil
-		//}
+		if objectSize >= commons.DefaultMaxPhotoSize {
+			anlogger.Warnf(lc, "internal_handle_upload.go : uploaded object too big, bucket [%s], objectKey [%s], objectSize [%v] for userId [%s]",
+				objectBucket, objectKey, objectSize, userId)
+			task := apimodel.NewRemoveS3ObjectAsyncTask(objectBucket, objectKey)
+			ok, errStr = commons.SendAsyncTask(task, asyncTaskQueue, userId, 0, awsSqsClient, anlogger, lc)
+			if !ok {
+				return errors.New(errStr)
+			}
+			return nil
+		}
 
 		//now construct photo object
 		arr := strings.Split(objectKey, "_photo")
@@ -241,7 +238,7 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 			height := commons.ResolutionValues[resolution+"_height"]
 			resizedPhotoId := resolution + "_" + originS3PhotoId
 			targetKey := originS3PhotoId + "_" + resolution + extension
-			task := apimodel.NewResizePhotoAsyncTask(userId, resizedPhotoId, resolution, objectBucket, objectKey, publicPhotoBucketName, targetKey, userPhotoTable, width, height)
+			task := apimodel.NewResizePhotoAsyncTask(userId, userPhoto.PhotoId, resizedPhotoId, resolution, objectBucket, objectKey, publicPhotoBucketName, targetKey, userPhotoTable, width, height)
 			ok, errStr = commons.SendAsyncTask(task, asyncTaskQueue, userId, 0, awsSqsClient, anlogger, lc)
 			if !ok {
 				return errors.New(errStr)

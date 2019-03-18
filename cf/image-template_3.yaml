@@ -106,7 +106,6 @@ Globals:
             INTERNAL_STREAM_NAME:
               Fn::ImportValue:
                 !Join [ "-", [ !Ref Env, InternalEventStreamExportName] ]
-            NEED_WARM_UP_LAMBDA_NAMES: !Join [ ",", [ !FindInMap [FunctionName, GetPreSignedUrlFunction, !Ref Env], !FindInMap [FunctionName, GetOwnPhotosFunction, !Ref Env], !FindInMap [FunctionName, DeletePhotoFunction, !Ref Env], !FindInMap [FunctionName, InternalPresignFunction, !Ref Env], !FindInMap [FunctionName, InternalGetImagesFunction, !Ref Env]  ] ]
         Tags:
           Company: Ringoid
           Service: image
@@ -310,6 +309,7 @@ Resources:
         - AmazonSQSFullAccess
         - AmazonS3FullAccess
         - AmazonKinesisFirehoseFullAccess
+        - AmazonKinesisFullAccess
       Events:
         StartEvent:
           Type: SQS

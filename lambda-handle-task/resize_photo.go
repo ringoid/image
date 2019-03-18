@@ -15,9 +15,11 @@ import (
 	"image"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ringoid/commons"
+	"github.com/aws/aws-sdk-go/service/kinesis"
 )
 
-func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3manager.Uploader, awsDbClient *dynamodb.DynamoDB, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) error {
+func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3manager.Uploader, awsDbClient *dynamodb.DynamoDB,
+	commonStreamName string, awsKinesisClient *kinesis.Kinesis, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) error {
 	anlogger.Debugf(lc, "resize_photo.go : resize photo by request body [%s]", body)
 	var rTask apimodel.ResizePhotoAsyncTask
 	err := json.Unmarshal([]byte(body), &rTask)
@@ -39,6 +41,7 @@ func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3mana
 
 	width := rTask.TargetWidth
 	height := rTask.TargetHeight
+	resolution := fmt.Sprintf("%vx%v", width, height)
 
 	resized := transform.Resize(img, width, height, transform.Linear)
 	result := bytes.Buffer{}
@@ -67,6 +70,12 @@ func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3mana
 	}
 
 	ok, errStr = uploadImage(result.Bytes(), rTask.TargetBucket, rTask.TargetKey, rTask.UserId, uploader, lc, anlogger)
+	if !ok {
+		return errors.New(errStr)
+	}
+
+	event := commons.NewPhotoResizeEvent(rTask.UserId, rTask.OriginPhotoId, rTask.PhotoId, resolution, link)
+	ok, errStr = commons.SendCommonEvent(event, rTask.UserId, commonStreamName, rTask.UserId, awsKinesisClient, anlogger, lc)
 	if !ok {
 		return errors.New(errStr)
 	}

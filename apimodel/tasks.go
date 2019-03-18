@@ -55,35 +55,37 @@ func NewRemoveS3ObjectAsyncTask(bucket, key string) *RemoveS3ObjectAsyncTask {
 }
 
 type ResizePhotoAsyncTask struct {
-	TaskType     string `json:"taskType"`
-	UserId       string `json:"userId"`
-	PhotoId      string `json:"photoId"`
-	PhotoType    string `json:"photoType"`
-	SourceBucket string `json:"sourceBucket"`
-	SourceKey    string `json:"sourceKey"`
-	TargetWidth  int    `json:"targetWidth"`
-	TargetHeight int    `json:"targetHeight"`
-	TargetBucket string `json:"targetBucket"`
-	TargetKey    string `json:"targetKey"`
-	TableName    string `json:"tableName"`
+	TaskType      string `json:"taskType"`
+	UserId        string `json:"userId"`
+	OriginPhotoId string `json:"originPhotoId"`
+	PhotoId       string `json:"photoId"`
+	PhotoType     string `json:"photoType"`
+	SourceBucket  string `json:"sourceBucket"`
+	SourceKey     string `json:"sourceKey"`
+	TargetWidth   int    `json:"targetWidth"`
+	TargetHeight  int    `json:"targetHeight"`
+	TargetBucket  string `json:"targetBucket"`
+	TargetKey     string `json:"targetKey"`
+	TableName     string `json:"tableName"`
 }
 
 func (task ResizePhotoAsyncTask) String() string {
 	return fmt.Sprintf("%#v", task)
 }
 
-func NewResizePhotoAsyncTask(userId, photoId, photoType, sourceBucket, sourceKey, targetBucket, targetKey, tableName string, targetWidth, targetHeight int) *ResizePhotoAsyncTask {
+func NewResizePhotoAsyncTask(userId, originPhotoId, photoId, photoType, sourceBucket, sourceKey, targetBucket, targetKey, tableName string, targetWidth, targetHeight int) *ResizePhotoAsyncTask {
 	return &ResizePhotoAsyncTask{
-		TaskType:     ImageResizePhotoTaskType,
-		UserId:       userId,
-		PhotoId:      photoId,
-		PhotoType:    photoType,
-		SourceBucket: sourceBucket,
-		SourceKey:    sourceKey,
-		TargetWidth:  targetWidth,
-		TargetHeight: targetHeight,
-		TargetBucket: targetBucket,
-		TargetKey:    targetKey,
-		TableName:    tableName,
+		TaskType:      ImageResizePhotoTaskType,
+		UserId:        userId,
+		OriginPhotoId: originPhotoId,
+		PhotoId:       photoId,
+		PhotoType:     photoType,
+		SourceBucket:  sourceBucket,
+		SourceKey:     sourceKey,
+		TargetWidth:   targetWidth,
+		TargetHeight:  targetHeight,
+		TargetBucket:  targetBucket,
+		TargetKey:     targetKey,
+		TableName:     tableName,
 	}
 }
