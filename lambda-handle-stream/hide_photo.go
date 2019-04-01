@@ -24,7 +24,7 @@ func hidePhoto(body []byte, userPhotoTable, asyncTaskQueue string, awsSqsClient 
 
 	photoIds, originPhotoId := apimodel.GetAllPhotoIdsBasedOnSource(aEvent.OriginalPhotoId, aEvent.UserId, anlogger, lc)
 	for _, val := range photoIds {
-		ok, errStr := apimodel.MarkPhotoAsDel(aEvent.UserId, val, userPhotoTable, awsDbClient, anlogger, lc)
+		ok, errStr := apimodel.MarkPhotoAsHiddenInModerationProcess(aEvent.UserId, val, userPhotoTable, awsDbClient, anlogger, lc)
 		if !ok {
 			anlogger.Errorf(lc, "hide_photo.go : userId [%s], return %s to client", aEvent.UserId, errStr)
 			return errors.New(fmt.Sprintf("error mark photo as deleted, body %s : %v", string(body), err))
@@ -44,7 +44,7 @@ func hidePhoto(body []byte, userPhotoTable, asyncTaskQueue string, awsSqsClient 
 	}
 
 	//Mark photo meta info like deleted also
-	ok, errStr := apimodel.MarkPhotoAsDel(aEvent.UserId+commons.PhotoPrimaryKeyMetaPostfix, originPhotoId, userPhotoTable, awsDbClient, anlogger, lc)
+	ok, errStr := apimodel.MarkPhotoAsHiddenInModerationProcess(aEvent.UserId+commons.PhotoPrimaryKeyMetaPostfix, originPhotoId, userPhotoTable, awsDbClient, anlogger, lc)
 	if !ok {
 		anlogger.Errorf(lc, "hide_photo.go : userId [%s], return %s to client", aEvent.UserId, errStr)
 		return errors.New(fmt.Sprintf("error mark meta info about photo as deleted (durgin hide photo), body %s : %v", string(body), err))

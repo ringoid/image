@@ -3,16 +3,17 @@ package apimodel
 import "fmt"
 
 type UserPhoto struct {
-	UserId         string
-	PhotoId        string
-	PhotoSourceUri string //only for public photo
-	PhotoType      string //origin/resized_640x48/..
-	Bucket         string
-	Key            string
-	Size           int64
-	UpdatedAt      string
-	Likes          int
-	OriginPhotoId  string
+	UserId             string
+	PhotoId            string
+	PhotoSourceUri     string //only for public photo
+	PhotoType          string //origin/resized_640x48/..
+	Bucket             string
+	Key                string
+	Size               int64
+	UpdatedAt          string
+	Likes              int
+	OriginPhotoId      string
+	HiddenInModeration bool
 }
 
 func (model UserPhoto) String() string {

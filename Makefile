@@ -1,11 +1,8 @@
 stage-last-stack: clean stage-last-stack
-stage-all: clean stage-deploy
 
 test-last-stack: clean test-last-stack
-test-all: clean test-deploy
 
 prod-last-stack: clean prod-last-stack
-prod-all: clean prod-deploy
 
 build:
 	@echo '--- Building getpresigned-image function ---'

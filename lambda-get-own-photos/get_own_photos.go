@@ -172,12 +172,20 @@ func handler(ctx context.Context, request events.ALBTargetGroupRequest) (events.
 	resp := apimodel.GetOwnPhotosResp{}
 	ownPhotos := make([]apimodel.OwnPhoto, 0)
 	for _, value := range photos {
-		ownPhotos = append(ownPhotos, apimodel.OwnPhoto{
+		eachPhoto := apimodel.OwnPhoto{
 			PhotoId:       value.PhotoId,
 			PhotoUri:      value.PhotoSourceUri,
 			Likes:         value.Likes,
 			OriginPhotoId: value.OriginPhotoId,
-		})
+			Blocked:       false,
+		}
+		//check moderation
+		if value.HiddenInModeration {
+			eachPhoto.Blocked = true
+			eachPhoto.PhotoUri = ""
+		}
+
+		ownPhotos = append(ownPhotos, eachPhoto)
 	}
 	resp.Photos = ownPhotos
 
@@ -233,7 +241,7 @@ func getOwnPhotos(userId, resolution string, lc *lambdacontext.LambdaContext) ([
 				S: aws.String(resolution),
 			},
 		},
-		FilterExpression:       aws.String(fmt.Sprintf("attribute_not_exists(%s)", commons.PhotoDeletedAtColumnName)),
+		FilterExpression:       aws.String(fmt.Sprintf("attribute_not_exists(%s) OR attribute_exists(%s)", commons.PhotoDeletedAtColumnName, commons.PhotoHiddenAtColumnName)),
 		ConsistentRead:         aws.Bool(true),
 		KeyConditionExpression: aws.String("#userId = :userIdV AND begins_with(#photoId, :photoIdV)"),
 		TableName:              aws.String(userPhotoTable),
@@ -252,15 +260,22 @@ func getOwnPhotos(userId, resolution string, lc *lambdacontext.LambdaContext) ([
 	items := make([]*apimodel.UserPhoto, 0)
 	for _, v := range result.Items {
 		originPhotoId := strings.Replace(*v[commons.PhotoIdColumnName].S, resolution, "origin", 1)
+		hiddenInModeration := false
+		if val, ok := v[commons.PhotoHiddenAtColumnName]; ok {
+			if val.S != nil {
+				hiddenInModeration = true
+			}
+		}
 		items = append(items, &apimodel.UserPhoto{
-			UserId:         *v[commons.UserIdColumnName].S,
-			PhotoId:        *v[commons.PhotoIdColumnName].S,
-			PhotoSourceUri: *v[commons.PhotoSourceUriColumnName].S,
-			PhotoType:      *v[commons.PhotoTypeColumnName].S,
-			Bucket:         *v[commons.PhotoBucketColumnName].S,
-			Key:            *v[commons.PhotoKeyColumnName].S,
-			UpdatedAt:      *v[commons.UpdatedTimeColumnName].S,
-			OriginPhotoId:  originPhotoId,
+			UserId:             *v[commons.UserIdColumnName].S,
+			PhotoId:            *v[commons.PhotoIdColumnName].S,
+			PhotoSourceUri:     *v[commons.PhotoSourceUriColumnName].S,
+			PhotoType:          *v[commons.PhotoTypeColumnName].S,
+			Bucket:             *v[commons.PhotoBucketColumnName].S,
+			Key:                *v[commons.PhotoKeyColumnName].S,
+			UpdatedAt:          *v[commons.UpdatedTimeColumnName].S,
+			OriginPhotoId:      originPhotoId,
+			HiddenInModeration: hiddenInModeration,
 		})
 	}
 	anlogger.Debugf(lc, "get_own_photos.go : successfully fetch [%v] photos for userId [%s] and resolution [%s], result=%v",
@@ -282,7 +297,7 @@ func getMetaInfs(userId string, lc *lambdacontext.LambdaContext) (map[string]*ap
 				S: aws.String(metaInfPartitionKey),
 			},
 		},
-		FilterExpression:       aws.String(fmt.Sprintf("attribute_not_exists(%s)", commons.PhotoDeletedAtColumnName)),
+		FilterExpression:       aws.String(fmt.Sprintf("attribute_not_exists(%s) OR attribute_exists(%s)", commons.PhotoDeletedAtColumnName, commons.PhotoHiddenAtColumnName)),
 		ConsistentRead:         aws.Bool(true),
 		KeyConditionExpression: aws.String("#userId = :userIdV"),
 		TableName:              aws.String(userPhotoTable),
@@ -303,13 +318,14 @@ func getMetaInfs(userId string, lc *lambdacontext.LambdaContext) (map[string]*ap
 	items := make(map[string]*apimodel.UserPhotoMetaInf, 0)
 	for _, v := range result.Items {
 		photoId := *v[commons.PhotoIdColumnName].S
-
-		likes, err := strconv.Atoi(*v[commons.PhotoLikesColumnName].N)
-		if err != nil {
-			anlogger.Errorf(lc, "get_own_photos.go : error while convert likes from photo meta inf to int, photoId [%s] for userId [%s] : %v", photoId, userId, err)
-			return make(map[string]*apimodel.UserPhotoMetaInf, 0), false, commons.InternalServerError
+		likes := 0
+		if _, likeExist := v[commons.PhotoLikesColumnName]; likeExist {
+			likes, err = strconv.Atoi(*v[commons.PhotoLikesColumnName].N)
+			if err != nil {
+				anlogger.Errorf(lc, "get_own_photos.go : error while convert likes from photo meta inf to int, photoId [%s] for userId [%s] : %v", photoId, userId, err)
+				return make(map[string]*apimodel.UserPhotoMetaInf, 0), false, commons.InternalServerError
+			}
 		}
-
 		items[photoId] = &apimodel.UserPhotoMetaInf{
 			UserId:        *v[commons.UserIdColumnName].S,
 			OriginPhotoId: photoId,

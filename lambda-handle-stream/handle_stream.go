@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambdacontext"
-	"errors"
 	"github.com/ringoid/commons"
 	"github.com/aws/aws-sdk-go/service/sqs"
 )
@@ -90,7 +89,12 @@ func handler(ctx context.Context, event events.KinesisEvent) (error) {
 		err := json.Unmarshal(body, &aEvent)
 		if err != nil {
 			anlogger.Errorf(lc, "handle_stream.go : error unmarshal body [%s] to BaseInternalEvent : %v", body, err)
-			return errors.New(fmt.Sprintf("error unmarshal body %s : %v", body, err))
+			if err != nil {
+				anlogger.Errorf(lc, "handle_stream.go : skip record [%s]", string(body))
+				continue
+				//return err
+			}
+			//return errors.New(fmt.Sprintf("error unmarshal body %s : %v", body, err))
 		}
 		anlogger.Debugf(lc, "handle_stream.go : handle record %v", aEvent)
 
@@ -98,17 +102,20 @@ func handler(ctx context.Context, event events.KinesisEvent) (error) {
 		case commons.LikePhotoInternalEvent:
 			err = likePhoto(body, userPhotoTable, awsDbClient, lc, anlogger)
 			if err != nil {
-				return err
+				anlogger.Errorf(lc, "handle_stream.go : skip record [%s]", string(body))
+				//return err
 			}
 		case commons.UserDeleteHimselfEvent:
 			err = deleteAllPhotos(body, userPhotoTable, asyncTaskQueue, awsSqsClient, awsDbClient, lc, anlogger)
 			if err != nil {
-				return err
+				anlogger.Errorf(lc, "handle_stream.go : skip record [%s]", string(body))
+				//return err
 			}
 		case commons.HideUserPhotoInternalEvent:
 			err = hidePhoto(body, userPhotoTable, asyncTaskQueue, awsSqsClient, awsDbClient, lc, anlogger)
 			if err != nil {
-				return err
+				anlogger.Errorf(lc, "handle_stream.go : skip record [%s]", string(body))
+				//return err
 			}
 		}
 
