@@ -95,7 +95,7 @@ func getImage(bucket, key, userId string, downloader *s3manager.Downloader, lc *
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		anlogger.Errorf(lc, "resize_photo.go : error downloading image from bucket [%s] with a key [%s] for userId [%s] : %v",
+		anlogger.Warnf(lc, "resize_photo.go : error downloading image from bucket [%s] with a key [%s] for userId [%s] (could be already deleted image, but lets try again): %v",
 			bucket, key, userId, err)
 		return nil, false, commons.InternalServerError
 	}
