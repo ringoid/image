@@ -80,7 +80,8 @@ func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3mana
 		return errors.New(errStr)
 	}
 
-	anlogger.Debugf(lc, "resize_photo.go : successfully resize photo by request %v for userId [%s]", rTask, rTask.UserId)
+	anlogger.Infof(lc, "resize_photo.go : successfully resize photo with originId [%s] and resizedId [%s] for userId [%s]",
+		rTask.OriginPhotoId, rTask.PhotoId, rTask.UserId)
 	return nil
 }
 

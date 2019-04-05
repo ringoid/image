@@ -27,22 +27,7 @@ func removePhoto(body []byte, lc *lambdacontext.LambdaContext, anlogger *commons
 	if !ok {
 		return errors.New(errStr)
 	}
-
-	//There is no need to delete photo from DB, mark is enough
-	//so
-	//ok, errStr = deletePhotoFromDynamo(rTask.UserId, rTask.PhotoId, rTask.TableName, lc, anlogger)
-	//if !ok {
-	//	return errors.New(errStr)
-	//}
-	//
-	////we need to delete meta info also
-	//if strings.HasPrefix(rTask.PhotoId, "origin_") {
-	//	ok, errStr = deletePhotoFromDynamo(rTask.UserId+apimodel.PhotoPrimaryKeyMetaPostfix, rTask.PhotoId, rTask.TableName, lc, anlogger)
-	//	if !ok {
-	//		return errors.New(errStr)
-	//	}
-	//}
-
+	anlogger.Infof(lc, "remove_photo.go : successfully remove photo from bucket [%s] with key [%s] for userId [%s]", userPhoto.Bucket, userPhoto.Key, rTask.UserId)
 	return nil
 }
 
