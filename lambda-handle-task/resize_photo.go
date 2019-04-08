@@ -28,11 +28,23 @@ func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3mana
 		return errors.New(fmt.Sprintf("error unmarshal body %s : %v", body, err))
 	}
 
-	sourceImage, ok, errStr := getImage(rTask.SourceBucket, rTask.SourceKey, rTask.UserId, downloader, lc, anlogger)
-	if !ok {
-		return errors.New(errStr)
+	buff, err := getImage(rTask.SourceBucket, rTask.SourceKey, rTask.UserId, downloader, lc, anlogger)
+	if err != nil {
+		isExist, ok, errStr := isPhotoExist(rTask.UserId, rTask.OriginPhotoId, rTask.TableName, lc, anlogger)
+		if !ok {
+			return errors.New(errStr)
+		}
+		if isExist {
+			anlogger.Errorf(lc, "resize_photo.go : error downloading image from bucket [%s] with a key [%s] for userId [%s]: %v",
+				rTask.SourceBucket, rTask.SourceKey, rTask.UserId, err)
+			return errors.New(commons.InternalServerError)
+		}
+		anlogger.Infof(lc, "resize_photo.go : don't need resize photo with originId [%s] and resizedId [%s] for userId [%s] coz photo already deleted or hidden",
+			rTask.OriginPhotoId, rTask.PhotoId, rTask.UserId)
+		return nil
 	}
-	img, _, err := image.Decode(bytes.NewReader(sourceImage))
+
+	img, _, err := image.Decode(bytes.NewReader(buff.Bytes()))
 	if err != nil {
 		anlogger.Errorf(lc, "resize_photo.go : error decode image file from bucket [%s], key [%s] for userId [%s] : %v",
 			rTask.SourceBucket, rTask.SourceKey, rTask.UserId, err)
@@ -62,7 +74,7 @@ func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3mana
 		PhotoSourceUri: link,
 	}
 
-	ok, errStr = apimodel.SavePhoto(userPhoto, rTask.TableName, awsDbClient, anlogger, lc)
+	ok, errStr := apimodel.SavePhoto(userPhoto, rTask.TableName, awsDbClient, anlogger, lc)
 	if !ok && len(errStr) != 0 {
 		return errors.New(errStr)
 	} else if !ok && len(errStr) == 0 {
@@ -86,7 +98,7 @@ func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3mana
 }
 
 //return image, ok and error string
-func getImage(bucket, key, userId string, downloader *s3manager.Downloader, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) ([]byte, bool, string) {
+func getImage(bucket, key, userId string, downloader *s3manager.Downloader, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) (*aws.WriteAtBuffer, error) {
 	anlogger.Debugf(lc, "resize_photo.go : get image from bucket [%s] with a key [%s] for userId [%s]", bucket, key, userId)
 
 	buff := &aws.WriteAtBuffer{}
@@ -94,13 +106,7 @@ func getImage(bucket, key, userId string, downloader *s3manager.Downloader, lc *
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})
-	if err != nil {
-		anlogger.Warnf(lc, "resize_photo.go : error downloading image from bucket [%s] with a key [%s] for userId [%s] (could be already deleted image, but lets try again): %v",
-			bucket, key, userId, err)
-		return nil, false, commons.InternalServerError
-	}
-	anlogger.Debugf(lc, "resize_photo.go : successfully got image from bucket [%s] with a key [%s] for userId [%s]", bucket, key, userId)
-	return buff.Bytes(), true, ""
+	return buff, err
 }
 
 //return ok and error string
@@ -118,4 +124,43 @@ func uploadImage(source []byte, bucket, key, userId string, uploader *s3manager.
 	}
 	anlogger.Debugf(lc, "resize_photo.go : successfully uploaded image to bucket [%s] with a key [%s] for userId [%s]", bucket, key, userId)
 	return true, ""
+}
+
+func isPhotoExist(userId, originPhotoId, tableName string, lc *lambdacontext.LambdaContext, anlogger *commons.Logger) (bool, bool, string) {
+	anlogger.Debugf(lc, "resize_photo.go : check that photo with origin photoId [%s] for userId [%s] is still exist", originPhotoId, userId)
+	input := &dynamodb.GetItemInput{
+		Key: map[string]*dynamodb.AttributeValue{
+			commons.UserIdColumnName: {
+				S: aws.String(userId),
+			},
+			commons.PhotoIdColumnName: {
+				S: aws.String(originPhotoId),
+			},
+		},
+		ConsistentRead: aws.Bool(true),
+		TableName:      aws.String(tableName),
+	}
+
+	result, err := awsDbClient.GetItem(input)
+	if err != nil {
+		anlogger.Errorf(lc, "resize_photo.go : error while check that photo with origin photoId [%s] for userId [%s] is still exist : %v", originPhotoId, userId, err)
+		return false, false, commons.InternalServerError
+	}
+
+	if len(result.Item) == 0 {
+		anlogger.Debugf(lc, "resize_photo.go : there is no photo with origin photoId [%s] for userId [%s]", originPhotoId, userId)
+		return false, true, ""
+	}
+
+	if _, wasPhotoDeleted := result.Item[commons.PhotoDeletedAtColumnName]; wasPhotoDeleted {
+		anlogger.Debugf(lc, "resize_photo.go : photo with origin photoId [%s] for userId [%s] was deleted already", originPhotoId, userId)
+		return false, true, ""
+	}
+
+	if _, wasHidden := result.Item[commons.PhotoHiddenAtColumnName]; wasHidden {
+		anlogger.Debugf(lc, "resize_photo.go : photo with origin photoId [%s] for userId [%s] was hidden already", originPhotoId, userId)
+		return false, true, ""
+	}
+	anlogger.Debugf(lc, "resize_photo.go : successfully check that photo with origin photoId [%s] for userId [%s] still exist", originPhotoId, userId)
+	return true, true, ""
 }
