@@ -78,6 +78,8 @@ func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3mana
 	if !ok && len(errStr) != 0 {
 		return errors.New(errStr)
 	} else if !ok && len(errStr) == 0 {
+		anlogger.Infof(lc, "resize_photo.go : photo with originId [%s] and resizedId [%s] for userId [%s] was deleted during resize, so don't save resized photo in DB",
+			rTask.OriginPhotoId, rTask.PhotoId, rTask.UserId)
 		return nil
 	}
 

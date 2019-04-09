@@ -119,7 +119,7 @@ func MarkPhotoAsHiddenInModerationProcess(userId, photoId, tableName string, aws
 		&dynamodb.UpdateItemInput{
 			ExpressionAttributeNames: map[string]*string{
 				"#deletedAt": aws.String(commons.PhotoDeletedAtColumnName),
-				"#hiddenAt": aws.String(commons.PhotoHiddenAtColumnName),
+				"#hiddenAt":  aws.String(commons.PhotoHiddenAtColumnName),
 			},
 			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 				":deletedAtV": {
@@ -148,7 +148,6 @@ func MarkPhotoAsHiddenInModerationProcess(userId, photoId, tableName string, aws
 	anlogger.Debugf(lc, "common_action.go : successfully mark photoId [%s] as hidden during moderation for userId [%s]", photoId, userId)
 	return true, ""
 }
-
 
 func GetAllPhotoIdsBasedOnSource(sourceId, userId string, anlogger *commons.Logger, lc *lambdacontext.LambdaContext) ([]string, string) {
 	anlogger.Debugf(lc, "common_action.go : make del photo id list based on photoId [%s] for userId [%s]", sourceId, userId)
