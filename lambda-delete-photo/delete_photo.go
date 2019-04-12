@@ -176,7 +176,7 @@ func handler(ctx context.Context, request events.ALBTargetGroupRequest) (events.
 		}
 
 		if val == originPhotoId && userTakePartInReport {
-			anlogger.Warnf(lc, "delete_photo.go :  userId [%s] was reported, so kipp origin photo with photoId [%s] in S3", userId, val)
+			anlogger.Debugf(lc, "delete_photo.go :  userId [%s] was reported, so kipp origin photo with photoId [%s] in S3", userId, val)
 			continue
 		}
 
