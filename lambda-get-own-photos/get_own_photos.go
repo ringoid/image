@@ -216,10 +216,7 @@ func fillMetaPhotoInf(source []*apimodel.UserPhoto, metaMap map[string]*apimodel
 
 func sortOwnPhotos(source []*apimodel.UserPhoto) []*apimodel.UserPhoto {
 	sort.SliceStable(source, func(i, j int) bool {
-		if source[i].Likes == source[j].Likes {
-			return source[i].UpdatedAt > source[j].UpdatedAt
-		}
-		return source[i].Likes > source[j].Likes
+		return source[i].UpdatedAt > source[j].UpdatedAt
 	})
 	return source
 }
