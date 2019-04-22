@@ -113,6 +113,7 @@ func handler(ctx context.Context, request events.ALBTargetGroupRequest) (events.
 
 	userAgent := request.Headers["user-agent"]
 	if strings.HasPrefix(userAgent, "ELB-HealthChecker") {
+		makePresignUrl("", "", "", presignFunctionName, true, lc)
 		return commons.NewServiceResponse("{}"), nil
 	}
 
@@ -159,7 +160,7 @@ func handler(ctx context.Context, request events.ALBTargetGroupRequest) (events.
 		needToRetry = retry
 	}
 
-	uri, ok, errStr := makePresignUrl(userId, originPhotoBucketName, s3Key, presignFunctionName, lc)
+	uri, ok, errStr := makePresignUrl(userId, originPhotoBucketName, s3Key, presignFunctionName, false, lc)
 	if !ok {
 		anlogger.Errorf(lc, "get_presigned_url.go : return %s to client", errStr)
 		return commons.NewServiceResponse(errStr), nil
@@ -282,13 +283,14 @@ func parseParams(params string, lc *lambdacontext.LambdaContext) (*apimodel.GetP
 }
 
 //return uri, ok, error string
-func makePresignUrl(userId, bucket, key, functionName string, lc *lambdacontext.LambdaContext) (string, bool, string) {
+func makePresignUrl(userId, bucket, key, functionName string, isItWarmUpRequest bool, lc *lambdacontext.LambdaContext) (string, bool, string) {
 	anlogger.Debugf(lc, "get_presigned_url.go : make pre-signed url for userId [%s], bucket [%s] and key [%s]",
 		userId, bucket, key)
 
 	req := apimodel.MakePresignUrlInternalReq{
-		Bucket: bucket,
-		Key:    key,
+		WarmUpRequest: isItWarmUpRequest,
+		Bucket:        bucket,
+		Key:           key,
 	}
 
 	jsonBody, err := json.Marshal(req)
