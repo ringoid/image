@@ -63,11 +63,6 @@ func getUserPhoto(userId, photoId, tableName string, lc *lambdacontext.LambdaCon
 		return nil, true, ""
 	}
 
-	if _, ok := result.Item[commons.PhotoDeletedAtColumnName]; ok {
-		anlogger.Warnf(lc, "remove_photo.go : photoId [%s] already deleted for userId [%s]", photoId, userId)
-		return nil, true, ""
-	}
-
 	_, photoDeleted := result.Item[commons.PhotoDeletedAtColumnName]
 	backetAttr, bucketExist := result.Item[commons.PhotoBucketColumnName]
 	keyAttr, keyExist := result.Item[commons.PhotoKeyColumnName]
