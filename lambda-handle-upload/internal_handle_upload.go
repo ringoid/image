@@ -238,11 +238,19 @@ func handler(ctx context.Context, request events.S3Event) (error) {
 			height := commons.ResolutionValues[resolution+"_height"]
 			resizedPhotoId := resolution + "_" + originS3PhotoId
 			targetKey := originS3PhotoId + "_" + resolution + extension
-			task := apimodel.NewResizePhotoAsyncTask(userId, userPhoto.PhotoId, resizedPhotoId, resolution, objectBucket, objectKey, publicPhotoBucketName, targetKey, userPhotoTable, width, height)
+			task := apimodel.NewResizePhotoAsyncTask(userId, userPhoto.PhotoId, resizedPhotoId, resolution, commons.DefaultJPEGQuality, objectBucket, objectKey, publicPhotoBucketName, targetKey, userPhotoTable, width, height)
 			ok, errStr = commons.SendAsyncTask(task, asyncTaskQueue, userId, 0, awsSqsClient, anlogger, lc)
 			if !ok {
 				return errors.New(errStr)
 			}
+		}
+		//make thumbnail
+		thumbnailResizedPhotoId := commons.ThumbnailPhotoType + "_" + originS3PhotoId
+		thumbnailTargetKey := originS3PhotoId + "_" + commons.ThumbnailPhotoType + extension
+		task := apimodel.NewResizePhotoAsyncTask(userId, userPhoto.PhotoId, thumbnailResizedPhotoId, commons.ThumbnailPhotoType, commons.ThumbnailJPEGQuality, objectBucket, objectKey, publicPhotoBucketName, thumbnailTargetKey, userPhotoTable, commons.ThumbnailPhotoWidth, commons.ThumbnailPhotoHeight)
+		ok, errStr = commons.SendAsyncTask(task, asyncTaskQueue, userId, 0, awsSqsClient, anlogger, lc)
+		if !ok {
+			return errors.New(errStr)
 		}
 	}
 	anlogger.Debugf(lc, "internal_handle_upload.go : successfully handle photo upload request %v", request)

@@ -60,6 +60,7 @@ type ResizePhotoAsyncTask struct {
 	OriginPhotoId string `json:"originPhotoId"`
 	PhotoId       string `json:"photoId"`
 	PhotoType     string `json:"photoType"`
+	PhotoQuality  int    `json:"photoQuality"`
 	SourceBucket  string `json:"sourceBucket"`
 	SourceKey     string `json:"sourceKey"`
 	TargetWidth   int    `json:"targetWidth"`
@@ -73,13 +74,14 @@ func (task ResizePhotoAsyncTask) String() string {
 	return fmt.Sprintf("%#v", task)
 }
 
-func NewResizePhotoAsyncTask(userId, originPhotoId, photoId, photoType, sourceBucket, sourceKey, targetBucket, targetKey, tableName string, targetWidth, targetHeight int) *ResizePhotoAsyncTask {
+func NewResizePhotoAsyncTask(userId, originPhotoId, photoId, photoType string, photoQuality int, sourceBucket, sourceKey, targetBucket, targetKey, tableName string, targetWidth, targetHeight int) *ResizePhotoAsyncTask {
 	return &ResizePhotoAsyncTask{
 		TaskType:      ImageResizePhotoTaskType,
 		UserId:        userId,
 		OriginPhotoId: originPhotoId,
 		PhotoId:       photoId,
 		PhotoType:     photoType,
+		PhotoQuality:  photoQuality,
 		SourceBucket:  sourceBucket,
 		SourceKey:     sourceKey,
 		TargetWidth:   targetWidth,

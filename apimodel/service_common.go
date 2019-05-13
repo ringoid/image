@@ -156,6 +156,8 @@ func GetAllPhotoIdsBasedOnSource(sourceId, userId string, anlogger *commons.Logg
 	allIds := make([]string, 0)
 	originPhotoId, _ := commons.GetOriginPhotoId(userId, sourceId, anlogger, lc)
 	allIds = append(allIds, originPhotoId)
+	thumbnailPhotoId, _ := commons.GetThumbnailPhotoId(userId, sourceId, anlogger, lc)
+	allIds = append(allIds, thumbnailPhotoId)
 	for key, _ := range commons.AllowedPhotoResolution {
 		allIds = append(allIds, key+"_"+baseId)
 	}

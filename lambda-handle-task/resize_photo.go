@@ -54,10 +54,12 @@ func resizePhoto(body []byte, downloader *s3manager.Downloader, uploader *s3mana
 	width := rTask.TargetWidth
 	height := rTask.TargetHeight
 	resolution := fmt.Sprintf("%vx%v", width, height)
-
+	if rTask.PhotoType == commons.ThumbnailPhotoType {
+		resolution = resolution + "_" + commons.ThumbnailPhotoType
+	}
 	resized := transform.Resize(img, width, height, transform.Linear)
 	result := bytes.Buffer{}
-	err = imgio.JPEGEncoder(commons.DefaultJPEGQuality)(&result, resized)
+	err = imgio.JPEGEncoder(rTask.PhotoQuality)(&result, resized)
 	if err != nil {
 		anlogger.Errorf(lc, "resize_photo.go : error encode image file from bucket [%s], key [%s] with target width [%d] and target height [%d] for userId [%s] : %v",
 			rTask.SourceBucket, rTask.SourceKey, width, height, rTask.UserId, err)
