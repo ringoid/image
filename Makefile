@@ -21,6 +21,8 @@ build:
 	GOOS=linux go build lambda-internal-getimages/get_images.go
 	@echo '--- Building internal-clean-db-image function ---'
 	GOOS=linux go build lambda-clean-db/clean.go
+	@echo '--- Building internal-internal-create-thumbnailsFunction-image function ---'
+	GOOS=linux go build lambda-internal-createthumbnails/create_thumbnails.go
 
 test-deploy-internal:
 	@echo '--- Build and deploy PresignFunction to TEST ---'
@@ -51,6 +53,8 @@ zip_lambda: build
 	zip get_images.zip ./get_images
 	@echo '--- Zip internal-clean-db-image function ---'
 	zip clean.zip ./clean
+	@echo '--- Zip internal-internal-create-thumbnailsFunction-image function ---'
+	zip create_thumbnails.zip ./create_thumbnails
 
 test-deploy: test-deploy-internal zip_lambda
 	@echo '--- Build lambda test ---'
@@ -137,4 +141,6 @@ clean:
 	rm -rf get_images
 	rm -rf clean.zip
 	rm -rf clean
+	rm -rf create_thumbnails
+	rm -rf create_thumbnails.zip
 

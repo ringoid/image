@@ -61,6 +61,10 @@ Mappings:
       stage: stage-internal-clean-db-image
       prod: prod-internal-clean-db-image
 
+    InternalConvertThumbnailsFunction:
+      test: test-internal-create-thumbnailsFunction-image
+      stage: stage-internal-create-thumbnailsFunction-image
+      prod: prod-internal-create-thumbnailsFunction-image
 
 Parameters:
   Env:
@@ -352,6 +356,19 @@ Resources:
       Policies:
         - AmazonDynamoDBFullAccess
         - AmazonKinesisFirehoseFullAccess
+
+  InternalConvertThumbnailsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !FindInMap [FunctionName, InternalConvertThumbnailsFunction, !Ref Env]
+      Handler: create_thumbnails
+      CodeUri: ../create_thumbnails.zip
+      Description: Internal Convert Thumbnails function
+      Policies:
+        - AmazonDynamoDBFullAccess
+        - AmazonKinesisFirehoseFullAccess
+        - AmazonSQSFullAccess
+        - AWSLambdaFullAccess
 
   PhotoUserMappingTable:
     Type: AWS::DynamoDB::Table
