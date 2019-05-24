@@ -30,9 +30,11 @@ var clientLambda *lambda.Lambda
 var photoUserMappingTableName string
 var originPhotoBucketName string
 var userPhotoTable string
+var env string
+
+var userIdStatusEnabledMap map[string]bool
 
 func init() {
-	var env string
 	var ok bool
 	var papertrailAddress string
 	var err error
@@ -111,6 +113,20 @@ func init() {
 
 	awsDeliveryStreamClient = firehose.New(awsSession)
 	anlogger.Debugf(nil, "lambda-initialization : get_own_photos.go : firehose client was successfully initialized")
+
+	userIdStatusEnabledMap = make(map[string]bool)
+	//Kirill
+	userIdStatusEnabledMap["d0b285a7d39f07e528dfba085e07a6135ddde188"] = true
+	userIdStatusEnabledMap["ea6fa85e8afcf574d50c59b1d6cd1f2217fb718c"] = true
+	userIdStatusEnabledMap["b9094fec646aa6296d0d3b3238801f92af34083a"] = true
+	userIdStatusEnabledMap["54047644372b264ee02a1ac4e47cc6d02fc517bd"] = true
+	//Iam
+	userIdStatusEnabledMap["f2c1e8abc72645c23cf2f89c8f0e7cb4fd7d9adc"] = true
+	//Victor
+	userIdStatusEnabledMap["c86a29c241f8a0dadf3cff31b4c831bbfe3f2633"] = true
+	//Maxim
+	userIdStatusEnabledMap["f966276704b50ec1d472e34bbd184d89082bcdfb"] = true
+
 }
 
 func handler(ctx context.Context, request events.ALBTargetGroupRequest) (events.ALBTargetGroupResponse, error) {
@@ -191,6 +207,17 @@ func handler(ctx context.Context, request events.ALBTargetGroupRequest) (events.
 
 	event := commons.NewGetOwnPhotosEvent(userId, sourceIp, len(resp.Photos))
 	commons.SendAnalyticEvent(event, userId, deliveryStreamName, awsDeliveryStreamClient, anlogger, lc)
+
+	resp.LastOnlineText = "Online"
+	resp.LastOnlineFlag = "online"
+	resp.DistanceText = "<1km"
+
+	//todo:delete after tests
+	if allow := userIdStatusEnabledMap[userId]; env == "prod" && !allow {
+		resp.LastOnlineText = "unknown"
+		resp.LastOnlineFlag = "unknown"
+		resp.DistanceText = "unknown"
+	}
 
 	body, err := json.Marshal(resp)
 	if err != nil {

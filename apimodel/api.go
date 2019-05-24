@@ -48,6 +48,10 @@ func (resp MakePresignUrlInternalResp) String() string {
 type GetOwnPhotosResp struct {
 	commons.BaseResponse
 	Photos []OwnPhoto `json:"photos"`
+	LastOnlineText string `json:"lastOnlineText"`
+	LastOnlineFlag string `json:"lastOnlineFlag"`
+	DistanceText   string `json:"distanceText"`
+
 }
 
 func (resp GetOwnPhotosResp) String() string {
@@ -55,11 +59,11 @@ func (resp GetOwnPhotosResp) String() string {
 }
 
 type OwnPhoto struct {
-	PhotoId       string `json:"photoId"`
-	PhotoUri      string `json:"photoUri"`
-	Likes         int    `json:"likes"`
-	OriginPhotoId string `json:"originPhotoId"`
-	Blocked       bool   `json:"blocked"`
+	PhotoId        string `json:"photoId"`
+	PhotoUri       string `json:"photoUri"`
+	Likes          int    `json:"likes"`
+	OriginPhotoId  string `json:"originPhotoId"`
+	Blocked        bool   `json:"blocked"`
 }
 
 func (obj OwnPhoto) String() string {
