@@ -210,14 +210,7 @@ func handler(ctx context.Context, request events.ALBTargetGroupRequest) (events.
 
 	resp.LastOnlineText = "Online"
 	resp.LastOnlineFlag = "online"
-	resp.DistanceText = "<1km"
-
-	//todo:delete after tests
-	if allow := userIdStatusEnabledMap[userId]; env == "prod" && !allow {
-		resp.LastOnlineText = "unknown"
-		resp.LastOnlineFlag = "unknown"
-		resp.DistanceText = "unknown"
-	}
+	resp.DistanceText = "unknown"
 
 	body, err := json.Marshal(resp)
 	if err != nil {
