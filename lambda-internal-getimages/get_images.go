@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/ringoid/commons"
+	"../apimodel"
 )
 
 var anlogger *commons.Logger
@@ -39,7 +40,7 @@ func init() {
 	}
 	fmt.Printf("lambda-initialization : get_images.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]\n", papertrailAddress)
 
-	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-get-images-image"))
+	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-get-images-image"), apimodel.IsDebugLogEnabled)
 	if err != nil {
 		fmt.Errorf("lambda-initialization : get_images.go : error during startup : %v\n", err)
 		os.Exit(1)

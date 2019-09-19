@@ -16,10 +16,10 @@ public class PresignFunction {
     private static final String REGION = "eu-west-1";
 
     public Response handle(Request request) {
-        log.info("handle request : {}", request);
+//        log.info("handle request : {}", request);
 
         if (request.getWarmUpRequest()) {
-            log.debug("it's warmup request");
+//            log.debug("it's warmup request");
             return null;
         }
 
@@ -34,13 +34,13 @@ public class PresignFunction {
         expiration.setTime(expTimeMillis);
 
         // Generate the pre-signed URL.
-        System.out.println("start generate pre-signed url");
+//        System.out.println("start generate pre-signed url");
         GeneratePresignedUrlRequest generatePresignedUrlRequest =
                 new GeneratePresignedUrlRequest(request.getBucket(), request.getKey())
                         .withMethod(HttpMethod.PUT)
                         .withExpiration(expiration);
         URL url = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
-        log.info("successfully generate pre-signed url : {}", url);
+//        log.info("successfully generate pre-signed url : {}", url);
         URI uri = null;
         try {
             uri = url.toURI();
@@ -52,7 +52,7 @@ public class PresignFunction {
 
         Response resp = new Response();
         resp.setUri(uri.toString());
-        log.info("return response to client : {}", resp);
+//        log.info("return response to client : {}", resp);
         return resp;
     }
 

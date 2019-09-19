@@ -48,7 +48,7 @@ func init() {
 	}
 	fmt.Printf("lambda-initialization : internal_handle_task.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]\n", papertrailAddress)
 
-	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-handle-task-image"))
+	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-handle-task-image"), apimodel.IsDebugLogEnabled)
 	if err != nil {
 		fmt.Errorf("lambda-initialization : internal_handle_task.go : error during startup : %v\n", err)
 		os.Exit(1)

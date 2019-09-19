@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/ringoid/commons"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"../apimodel"
 )
 
 var anlogger *commons.Logger
@@ -43,7 +44,7 @@ func init() {
 	}
 	fmt.Printf("lambda-initialization : handle_stream.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]\n", papertrailAddress)
 
-	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-handle-stream-image"))
+	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-handle-stream-image"), apimodel.IsDebugLogEnabled)
 	if err != nil {
 		fmt.Errorf("lambda-initialization : handle_stream.go : error during startup : %v\n", err)
 		os.Exit(1)

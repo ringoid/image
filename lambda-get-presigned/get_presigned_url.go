@@ -53,7 +53,7 @@ func init() {
 	}
 	fmt.Printf("lambda-initialization : get_presigned_url.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]\n", papertrailAddress)
 
-	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "get-presign-url-image"))
+	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "get-presign-url-image"), apimodel.IsDebugLogEnabled)
 	if err != nil {
 		fmt.Errorf("lambda-initialization : get_presigned_url.go : error during startup : %v\n", err)
 		os.Exit(1)

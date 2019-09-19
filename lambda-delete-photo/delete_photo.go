@@ -56,7 +56,7 @@ func init() {
 	}
 	fmt.Printf("lambda-initialization : delete_photo.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]\n", papertrailAddress)
 
-	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "delete-photo-image"))
+	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "delete-photo-image"), apimodel.IsDebugLogEnabled)
 	if err != nil {
 		fmt.Errorf("lambda-initialization : delete_photo.go : error during startup : %v\n", err)
 	}

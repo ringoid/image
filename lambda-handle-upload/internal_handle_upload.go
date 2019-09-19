@@ -62,7 +62,7 @@ func init() {
 	}
 	fmt.Printf("lambda-initialization : internal_handle_upload.go : start with PAPERTRAIL_LOG_ADDRESS = [%s]\n", papertrailAddress)
 
-	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-handle-upload-image"))
+	anlogger, err = commons.New(papertrailAddress, fmt.Sprintf("%s-%s", env, "internal-handle-upload-image"), apimodel.IsDebugLogEnabled)
 	if err != nil {
 		fmt.Errorf("lambda-initialization : internal_handle_upload.go : error during startup : %v\n", err)
 		os.Exit(1)
